@@ -5,7 +5,6 @@ use std::fmt;
 #[derive(Clone)]
 pub enum TokenType {
     None,
-    End,
     OpPlus,
     OpMinus,
     OpMul,
@@ -19,16 +18,20 @@ pub enum TokenType {
     OpLessEqual,
     OpLogicalOr,
     OpLogicalAnd,
-    OpenParen,
-    CloseParen,
-    OpenScope,
-    CloseScope,
     KeywordFunctionDecl,
     KeywordExit,
     KeywordDebugDump,
     KeywordVariableDecl,
     KeywordIf,
     KeywordElse,
+    KeywordFor,
+    KeywordBreak,
+    KeywordContinue,
+    End,
+    OpenParen,
+    CloseParen,
+    OpenScope,
+    CloseScope,
     Identifier,
     LiteralInt,
 }
@@ -48,21 +51,29 @@ impl fmt::Display for Pos {
 #[derive(Clone)]
 pub struct Token {
     pub kind: TokenType,
-    pub val: Vec<u8>,
-    pub pos: Pos,
+    pub val:  Vec<u8>,
+    pub pos:  Pos,
 }
 impl Token {
     pub fn val_str(&self) -> String {
         String::from_utf8(self.val.clone()).expect("Error: Failed to convert token value to string")
     }
+
+    pub fn new_null() -> Self {
+        Token {
+            kind: TokenType::None,
+            val: vec![],
+            pos: Pos { row: usize::MAX - 1, col: usize::MAX - 1 },
+        }
+    }
 }
 
 pub struct Lexer {
     pub toks: Vec<Token>,
-    pub pos: Pos,
-    src: Vec<u8>,
-    cur: usize,
-    rune: u8,
+    pub pos:  Pos,
+    src:      Vec<u8>,
+    cur:      usize,
+    rune:     u8,
 }
 impl Lexer {
     pub fn new(src: Vec<u8>) -> Self {
@@ -263,18 +274,21 @@ impl Lexer {
                 }
             } else {
                 match tok.val_str().as_str() {
-                    "=="   => tok.kind = TokenType::OpEqual,
-                    "~="   => tok.kind = TokenType::OpNotEqual,
-                    ">="   => tok.kind = TokenType::OpGreaterEqual,
-                    "<="   => tok.kind = TokenType::OpLessEqual,
-                    "&&"   => tok.kind = TokenType::OpLogicalAnd,
-                    "||"   => tok.kind = TokenType::OpLogicalOr,
-                    "exit" => tok.kind = TokenType::KeywordExit,
-                    "func" => tok.kind = TokenType::KeywordFunctionDecl,
-                    "dump" => tok.kind = TokenType::KeywordDebugDump,
-                    "if"   => tok.kind = TokenType::KeywordIf,
-                    "else" => tok.kind = TokenType::KeywordElse,
-                    "let"  => tok.kind = TokenType::KeywordVariableDecl,
+                    "=="       => tok.kind = TokenType::OpEqual,
+                    "~="       => tok.kind = TokenType::OpNotEqual,
+                    ">="       => tok.kind = TokenType::OpGreaterEqual,
+                    "<="       => tok.kind = TokenType::OpLessEqual,
+                    "&&"       => tok.kind = TokenType::OpLogicalAnd,
+                    "||"       => tok.kind = TokenType::OpLogicalOr,
+                    "exit"     => tok.kind = TokenType::KeywordExit,
+                    "func"     => tok.kind = TokenType::KeywordFunctionDecl,
+                    "dump"     => tok.kind = TokenType::KeywordDebugDump,
+                    "if"       => tok.kind = TokenType::KeywordIf,
+                    "else"     => tok.kind = TokenType::KeywordElse,
+                    "let"      => tok.kind = TokenType::KeywordVariableDecl,
+                    "for"      => tok.kind = TokenType::KeywordFor,
+                    "continue" => tok.kind = TokenType::KeywordContinue,
+                    "break"    => tok.kind = TokenType::KeywordBreak,
                     _ => { // Then match variable contents of words
                         if tok.val.iter().all(|c| c.is_ascii_digit()) {
                             tok.kind = TokenType::LiteralInt;

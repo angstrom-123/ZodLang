@@ -46,3 +46,5 @@ fn test_variable() { run_test("variable"); }
 fn test_function() { run_test("function"); }
 #[test]
 fn test_redeclare() { run_test("redeclare"); }
+#[test]
+fn test_loop() { run_test("loop"); }

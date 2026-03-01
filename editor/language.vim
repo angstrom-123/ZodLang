@@ -18,7 +18,7 @@ set iskeyword=a-z,A-Z,_
 syntax keyword langTodos TODO BUG NOTE
 
 " Language Keywords 
-syntax keyword langKeywords if if* else func let exit dump 
+syntax keyword langKeywords if if* else func let exit dump continue break for
 
 " Comments 
 syntax region langCommentLine start="//" end="$" contains=langTodos
