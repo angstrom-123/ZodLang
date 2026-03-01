@@ -21,6 +21,7 @@ pub enum NodeType {
     UnOp,
     Conditional,
     ForLoop,
+    WhileLoop,
     Literal,
     Break,
     Continue,
@@ -215,6 +216,14 @@ impl ParseNode {
         }
     }
 
+    fn new_while_loop(tok: Token, cond: ParseNode, body_block: ParseNode) -> Self {
+        ParseNode {
+            kind: NodeType::WhileLoop,
+            tok,
+            children: vec![cond, body_block],
+        }
+    }
+
     fn new_break(tok: Token) -> Self {
         ParseNode {
             kind: NodeType::Break,
@@ -269,6 +278,7 @@ impl ParseTree {
      *                  | <id> "=" <add_expr> ";"
      *                  | "if" <or_expr> "{" { <block_item> } "}" [ "else" "{" { <block_item> } "}"
      *                  | "for" [ <decl> | <or_expr> ] ";" [ <or_expr> ] ";" [ <or_expr> ] "{" { <block_item> } "}"
+     *                  | "while" <or_expr> "{" { <block_item> } "}"
      * <decl>        ::= "let" <id> [ "=" <add_expr> ] ";"
      * <or_expr>     ::= <and_expr> { "||" <and_expr> }
      * <and_expr>    ::= <equ_expr> { "&&" <equ_expr> }
@@ -405,9 +415,12 @@ impl ParseTree {
     fn parse_block_item(&mut self, lexer: &mut Lexer) -> ParseNode {
         let tok: Token = lexer.peek_token();
         match tok.kind {
-            TokenType::KeywordVariableDecl => self.parse_decl(lexer),
-            TokenType::KeywordFor | TokenType::KeywordIf | TokenType::KeywordExit | TokenType::KeywordDebugDump | 
-            TokenType::Identifier | TokenType::KeywordBreak | TokenType::KeywordContinue => {
+            TokenType::KeywordVariableDecl => {
+                self.parse_decl(lexer)
+            },
+            TokenType::KeywordFor | TokenType::KeywordIf | TokenType::KeywordExit | 
+            TokenType::KeywordDebugDump | TokenType::Identifier | TokenType::KeywordBreak | 
+            TokenType::KeywordContinue | TokenType::KeywordWhile => {
                 self.parse_statement(lexer)
             },
             _ => panic!("{} Error: Expected block item but got `{}`", tok.pos, tok.val_str())
@@ -455,6 +468,23 @@ impl ParseTree {
                     panic!("{} Error: Expected `;` but got `{}`", next_tok.pos, next_tok.val_str());
                 }
                 ParseNode::new_continue(tok)
+            },
+            TokenType::KeywordWhile => {
+                let expression: ParseNode = self.parse_or_expr(lexer);
+                let mut next_tok = lexer.consume_token();
+                if next_tok.kind != TokenType::OpenScope {
+                    panic!("{} Error: Expected `{{` but got `{}`", next_tok.pos, next_tok.val_str());
+                }
+
+                let mut body: Vec<ParseNode> = Vec::new();
+                next_tok = lexer.peek_token();
+                while next_tok.kind != TokenType::CloseScope {
+                    body.push(self.parse_block_item(lexer));
+                    next_tok = lexer.peek_token();
+                }
+                lexer.consume_token();
+
+                ParseNode::new_while_loop(tok, expression, ParseNode::new_block(body))
             },
             TokenType::KeywordFor => {
                 let init: Option<ParseNode>;

@@ -10,15 +10,16 @@ Debug Build:
 cargo build
 ```
 
+### Run the Tests 
+```
+cargo test
+```
+
 ### Run the Compiler
 ```
 ./<compiler_path> <file_path> <flags>
 ```
 
-### Run the Tests 
-```
-cargo test
-```
 
 | Flag         | Shorthand | Argument | Meaning               |
 | -----------  | --------- | -------- | --------------------- |
@@ -48,6 +49,17 @@ func <function_name> {
 }
 
 <function_name>();
+```
+
+### Loops 
+```
+for <init>; <condition>; <post> {
+    <body>
+}
+
+while <condition> {
+    <body>
+}
 ```
 
 ### Local Variables

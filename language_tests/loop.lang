@@ -63,5 +63,25 @@ func main {
     }
     dump i;
 
+    i = 0;
+    while i < 10 {
+        dump i;
+        i = i + 1;
+    }
+
+    let ctr = 0;
+    while 1 {
+        ctr = ctr + 1;
+
+        if ctr == 5 {
+            continue;
+        }
+        if ctr == 10 {
+            break;
+        }
+
+        dump ctr;
+    }
+
     exit 0;
 }

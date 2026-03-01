@@ -260,6 +260,37 @@ fn generate_block_nasm_x86(f: &mut fs::File, ctx: &mut Context, block: &ParseNod
 
 fn generate_block_item_nasm_x86(f: &mut fs::File, ctx: &mut Context, block_item: &ParseNode) -> std::io::Result<()> {
     match block_item.kind {
+        NodeType::WhileLoop => {
+            let tok: &Token = &block_item.tok;
+            let mut it: Iter<ParseNode> = block_item.children.iter();
+            let cond: &ParseNode = it.next().unwrap_or_else(|| panic!("{} Error: Failed to get condition in `while` loop", tok.pos));
+            let body: &ParseNode = it.next().unwrap_or_else(|| panic!("{} Error: Failed to get body in `while` loop", tok.pos));
+
+            let mut loop_ctx: Context = Context {
+                vars: HashMap::new(),
+                stack_ix: ctx.stack_ix,
+                loop_scope: tok.clone(),
+            };
+            for var in ctx.vars.clone() {
+                loop_ctx.vars.insert(var.0, var.1);
+            }
+
+            writeln!(f, "; --- While Loop ---")?;
+            writeln!(f, "; --- While Condition ---")?;
+            writeln!(f, "_loop_{}_{}:", tok.pos.row, tok.pos.col)?;
+            for node in &cond.post_order() {
+                generate_node_nasm_x86(f, ctx, node)?;
+            }
+            writeln!(f, "    pop rax")?;
+            writeln!(f, "    cmp rax, 0")?;
+            writeln!(f, "    je _end_{}_{}", tok.pos.row, tok.pos.col)?;
+            writeln!(f, "; --- While Body ---")?;
+            generate_block_nasm_x86(f, &mut loop_ctx, body)?;
+            writeln!(f, "; --- While Repeat ---")?;
+            writeln!(f, "_post_{}_{}:", tok.pos.row, tok.pos.col)?;
+            writeln!(f, "    jmp _loop_{}_{}", tok.pos.row, tok.pos.col)?;
+            writeln!(f, "_end_{}_{}:", tok.pos.row, tok.pos.col)?;
+        },
         NodeType::ForLoop => {
             let tok: &Token = &block_item.tok;
             let mut it: Iter<ParseNode> = block_item.children.iter();
@@ -549,27 +580,4 @@ pub fn main() {
             compile(src, path.to_string(), out, flags);
         }
     }
-
-    // let mut it = args.iter();
-    // let com: &String = it.next().unwrap_or_else(|| panic!("Error: Failed to read compiler name from command line arguments"));
-    // let src_path: &String = it.next().unwrap_or_else(|| panic!("{}", usage(com, "\x1b[33m<file path>\x1b[0m")));
-    // let res_path: &'static str = "output";
-    //
-    // let mut flags: Vec<Flag> = Vec::new();
-    // for arg in it {
-    //     match arg.as_str() {
-    //         "-r" | "--run"         => flags.push(Flag::Run),
-    //         "-a" | "--assembly"    => flags.push(Flag::EmitAsm),
-    //         "-pt" | "--parse-tree" => flags.push(Flag::EmitParseTree),
-    //         "-t" | "--tokens"      => flags.push(Flag::EmitTokens),
-    //         "-o" | "--output_path" => {
-    //             let next: &String = it.next().unwrap_or_else(|| panic!("{}", usage(com, "\x1b[33m<file path>\x1b[0m")));
-    //
-    //         },
-    //         _ => panic!("{}", usage(com, src_path))
-    //     }
-    // }
-
-    // let src_code: String = fs::read_to_string(src_path).unwrap_or_else(|_| panic!("{}", usage(com, src_path)));
-    // compile(src_path.to_string(), src_code, flags);
 }

@@ -27,6 +27,7 @@ pub enum TokenType {
     KeywordFor,
     KeywordBreak,
     KeywordContinue,
+    KeywordWhile,
     End,
     OpenParen,
     CloseParen,
@@ -287,6 +288,7 @@ impl Lexer {
                     "else"     => tok.kind = TokenType::KeywordElse,
                     "let"      => tok.kind = TokenType::KeywordVariableDecl,
                     "for"      => tok.kind = TokenType::KeywordFor,
+                    "while"    => tok.kind = TokenType::KeywordWhile,
                     "continue" => tok.kind = TokenType::KeywordContinue,
                     "break"    => tok.kind = TokenType::KeywordBreak,
                     _ => { // Then match variable contents of words
