@@ -130,7 +130,27 @@ impl Lexer {
                         lexeme.clear();
                     }
                 },
-                b';' | b'+' | b'-' | b'*' | b'/' | b'(' | b')' | b'{' | b'}' => {
+                b'/' => {
+                    if !lexeme.is_empty() {
+                        let last: u8 = *lexeme.last().expect("Error: Failed to get last char in lexeme");
+                        if last == b'/' {
+                            lexeme.clear();
+                            while self.advance_char() && self.rune != b'\n' {}
+                            self.advance_char();
+                            continue;
+                        } else {
+                            self.toks.push(Token {
+                                kind: TokenType::None,
+                                val: lexeme.clone(),
+                                pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() },
+                            });
+                            lexeme.clear();
+                        }
+                    }
+
+                    lexeme.push(self.rune);
+                },
+                b';' | b'+' | b'-' | b'*' | b'(' | b')' | b'{' | b'}' => {
                     if !lexeme.is_empty() {
                         self.toks.push(Token {
                             kind: TokenType::None,

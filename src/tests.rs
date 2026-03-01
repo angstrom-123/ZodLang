@@ -48,3 +48,5 @@ fn test_function() { run_test("function"); }
 fn test_redeclare() { run_test("redeclare"); }
 #[test]
 fn test_loop() { run_test("loop"); }
+#[test]
+fn test_comment() { run_test("comment"); }
