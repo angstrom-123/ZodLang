@@ -1,0 +1,43 @@
+// Entrypoint function
+i64 main() {
+    // For loops with init; condition; post
+    for i64 i = 0; i < 3; i = i + 1 {
+        for i64 j = 2; j >= 0; j = j - 1 {
+            dump add(i, j);
+        }
+    }
+
+    // This while condition is 1 (true) but could be anything
+    i64 counter = 0;
+    while 1 {
+        counter = counter + 2;
+        if counter < 5 {
+            continue; // Skip rest of loop body and repeat
+        }
+        dump counter;
+
+        if counter >= 10 {
+            break; // Exit loop
+        }
+    }
+
+    // Local variables are initialized to 0
+    i64 i;
+    dump i;
+
+    // For loop can miss out any of their conditions
+    for ; i < 5; {
+        dump i;
+        i = i + 1;
+    }
+
+    // Exit is implicitly called at the end of main, but you can call it 
+    // yourself to return an exit code.
+    exit 0;
+}
+
+// Functions can be declared before or after they are called
+i64 add(i64 a, i64 b) {
+    i64 c = a + b;
+    return c;
+}

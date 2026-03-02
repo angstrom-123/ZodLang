@@ -53,6 +53,9 @@ fn generate_node_nasm_x86(f: &mut fs::File, ctx: &mut Context, node: &ParseNode)
         NodeType::FuncCall => {
             writeln!(f, "; --- FuncCall {} ---", node.tok.val_str())?;
             writeln!(f, "    call {}", node.tok.val_str())?;
+            writeln!(f, "; --- Deallocate params ---")?;
+            writeln!(f, "    add rsp, {}", node.children.len() * 8)?;
+            writeln!(f, "    push rax")?;
         },
         NodeType::Literal => {
             writeln!(f, "; --- Literal {} ---", node.tok.val_str())?;
@@ -74,7 +77,7 @@ fn generate_node_nasm_x86(f: &mut fs::File, ctx: &mut Context, node: &ParseNode)
                 panic!("{} Error: Variable with this name is already declared `{}`", node.tok.pos, node.tok.val_str());
             }
             writeln!(f, "; --- VarDecl {} ---", node.tok.val_str())?;
-            // NOTE: This relies on the variable value being atop the stack already.
+            // NOTE: This relies on the variable value being on top of the stack already.
             ctx.vars.insert(node.tok.val.clone(), ctx.stack_ix);
             ctx.stack_ix -= 8;
         },
@@ -83,10 +86,20 @@ fn generate_node_nasm_x86(f: &mut fs::File, ctx: &mut Context, node: &ParseNode)
                 None => panic!("{} Error: No such variable `{}` in local scope", node.tok.pos, node.tok.val_str()),
                 Some(ofst) => {
                     writeln!(f, "; --- Var {} ---", node.tok.val_str())?;
-                    writeln!(f, "    mov rax, [rbp {}]", ofst)?;
+                    if *ofst < 0 {
+                        writeln!(f, "    mov rax, [rbp {}]", ofst)?;
+                    } else {
+                        writeln!(f, "    mov rax, [rbp + {}]", ofst)?;
+                    }
                     writeln!(f, "    push rax")?;
                 }
             }
+        },
+        NodeType::Return => {
+            writeln!(f, "; --- Return ---")?;
+            writeln!(f, "    pop rax")?; // Return value in rax
+            writeln!(f, "    jmp .epilogue")?;
+            // writeln!(f, "    ret")?;
         },
         NodeType::Exit => {
             writeln!(f, "; --- Exit ---")?;
@@ -349,7 +362,6 @@ fn generate_block_item_nasm_x86(f: &mut fs::File, ctx: &mut Context, block_item:
             for node in &guard.post_order() {
                 generate_node_nasm_x86(f, ctx, node)?;
             }
-            writeln!(f, "_if_{}_{}:", tok.pos.row, tok.pos.col)?;
             match else_body {
                 None => {
                     writeln!(f, "; --- If (No Else) ---")?;
@@ -374,12 +386,12 @@ fn generate_block_item_nasm_x86(f: &mut fs::File, ctx: &mut Context, block_item:
             }
         },
         NodeType::Assign | NodeType::Exit | NodeType::DebugDump | NodeType::VarDecl | NodeType::FuncCall | 
-        NodeType::Break | NodeType::Continue => {
+        NodeType::Break | NodeType::Continue | NodeType::Return => {
             for node in &block_item.post_order() {
                 generate_node_nasm_x86(f, ctx, node)?;
             }
         },
-        _ => panic!("{} Error: Expected block item but got `{}`", block_item.tok.pos, block_item.tok.val_str()),
+        _ => panic!("{} Error: Expected block item but got `{}` ({:?})", block_item.tok.pos, block_item.tok.val_str(), block_item.kind),
     }
 
     Ok(())
@@ -390,6 +402,11 @@ fn generate_nasm_x86(out_path: &String, ast: &mut ParseTree) -> std::io::Result<
     writeln!(f, "; --- Header ---")?;
     writeln!(f, "global _start")?;
     writeln!(f, "section .text")?;
+    writeln!(f, "_start:")?;
+    writeln!(f, "    call main")?;
+    writeln!(f, "    mov rdi, 0")?;
+    writeln!(f, "    mov rax, 60")?;
+    writeln!(f, "    syscall")?;
     writeln!(f, "; --- Debug Dump ---")?;
     writeln!(f, "dump:")?;
     writeln!(f, "    sub rsp, 40")?;
@@ -427,28 +444,37 @@ fn generate_nasm_x86(out_path: &String, ast: &mut ParseTree) -> std::io::Result<
         writeln!(f, "; --- Prologue {} ---", func.tok.val_str())?;
         writeln!(f, "    push rbp")?;
         writeln!(f, "    mov rbp, rsp")?;
+        if let Some((body, params)) = func.children.split_last() {
+            // Params start at rbp + 16, each offset by 8.
+            let mut ctx: Context = Context {
+                vars: HashMap::new(),
+                stack_ix: 16,
+                loop_scope: Token::new_null(),
+            };
+            
+            writeln!(f, "; --- Pull In Params ---")?;
+            for param in params {
+                ctx.vars.insert(param.tok.val.clone(), ctx.stack_ix);
+                ctx.stack_ix += 8;
+            }
+            // Reset stack index to be just above rbp for locals.
+            ctx.stack_ix = -8;
+            writeln!(f, "; --- Declaring Params Done ---")?;
 
-        let mut ctx: Context = Context {
-            vars: HashMap::new(),
-            stack_ix: -8,
-            loop_scope: Token::new_null(),
-        };
-        for block_item in &func.children {
-            generate_block_item_nasm_x86(&mut f, &mut ctx, block_item)?;
+            writeln!(f, "; --- Function Body ---")?;
+            for block_item in &body.children {
+                generate_block_item_nasm_x86(&mut f, &mut ctx, block_item)?;
+            }
+        } else { // No Body
+            eprintln!("{} Warning: function `{}` with no params or body is redundant", func.tok.pos, func.tok.val_str());
         }
 
         writeln!(f, "; --- Epilogue {} ---", func.tok.val_str())?;
+        writeln!(f, ".epilogue:")?;
         writeln!(f, "    mov rsp, rbp")?;
         writeln!(f, "    pop rbp")?;
         writeln!(f, "    ret")?;
     }
-
-    writeln!(f, "; --- Footer ---")?;
-    writeln!(f, "_start:")?;
-    writeln!(f, "    call main")?;
-    writeln!(f, "    mov rdi, 0")?;
-    writeln!(f, "    mov rax, 60")?;
-    writeln!(f, "    syscall")?;
 
     Ok(())
 }
@@ -541,10 +567,6 @@ pub fn usage(com: &str) -> String {
 }                  
                    
 pub fn main() {
-    // let args: Vec<String> = env::args().collect();
-
-    // TODO: make the args come in any order then make sure tests run with new name
-
     let mut flags: Vec<Flag> = Vec::new();
 
     let mut it = env::args();

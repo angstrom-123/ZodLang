@@ -1,24 +1,24 @@
-func main {
-    for let i = 0; i < 5; i = i + 1 {
+i64 main() {
+    for i64 i = 0; i < 5; i = i + 1 {
         dump i;
     }
 
-    for let i = 0; i < 5; i = i + 1 {
+    for i64 i = 0; i < 5; i = i + 1 {
         dump i;
     }
 
-    for let i = 0; i < 5; {
+    for i64 i = 0; i < 5; {
         dump i;
         i = i + 1;
     }
 
-    for let i = 4; 
+    for i64 i = 4; 
             i >= 0; 
             i = i - 1 {
         dump i;
     }
 
-    let i;
+    i64 i;
     for ; i < 5; i = i + 1 {
         dump i;
     }
@@ -29,14 +29,14 @@ func main {
         i = i + 1;
     }
 
-    for let j = 0; j < 10; j = j + 1 {
+    for i64 j = 0; j < 10; j = j + 1 {
         dump j;
         if j >= 5 {
             break;
         }
     }
 
-    for let j = 0; j < 10; j = j + 1 {
+    for i64 j = 0; j < 10; j = j + 1 {
         if j <= 5 {
             continue;
         }
@@ -69,7 +69,7 @@ func main {
         i = i + 1;
     }
 
-    let ctr = 0;
+    i64 ctr = 0;
     while 1 {
         ctr = ctr + 1;
 

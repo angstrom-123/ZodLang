@@ -34,8 +34,6 @@ fn run_test(test_name: &str) {
     let _ = Command::new("rm").arg(res_path.clone()).output().expect("Error: Failed to delete compiled executable");
 }
 
-// Run Tests
-
 #[test]
 fn test_arithmetic() { run_test("arithmetic"); }
 #[test]
@@ -50,3 +48,5 @@ fn test_redeclare() { run_test("redeclare"); }
 fn test_loop() { run_test("loop"); }
 #[test]
 fn test_comment() { run_test("comment"); }
+#[test]
+fn test_scope_break() { run_test("scope_break"); }

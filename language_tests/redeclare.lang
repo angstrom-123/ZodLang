@@ -1,14 +1,16 @@
-func main {
-    let a = 10;
+i64 main() {
+    i64 a = 10;
 
     if a == 10 {
         a = 30;
-        let b = 10;
+        i64 b = 10;
         dump b;
     }
 
-    let b = 20;
+    i64 b = 20;
 
     dump b;
     dump a;
+
+    exit 0;
 }

@@ -1,0 +1,13 @@
+i64 fib(i64 n) {
+    if n == 0 || n == 1 {
+        return n;
+    } else {
+        return fib(n - 1) + fib(n - 2);
+    }
+}
+
+i64 main() {
+    i64 n = 10;
+    dump fib(n); // 55
+    exit 0;
+}

@@ -18,17 +18,18 @@ pub enum TokenType {
     OpLessEqual,
     OpLogicalOr,
     OpLogicalAnd,
-    KeywordFunctionDecl,
+    KeywordReturn,
     KeywordExit,
     KeywordDebugDump,
-    KeywordVariableDecl,
     KeywordIf,
     KeywordElse,
     KeywordFor,
     KeywordBreak,
     KeywordContinue,
     KeywordWhile,
+    TypeInt64,
     End,
+    Separator,
     OpenParen,
     CloseParen,
     OpenScope,
@@ -45,6 +46,9 @@ pub struct Pos {
 impl fmt::Display for Pos {
     // NOTE: Stored row and column are indices starting from 0, whereas in files, we count from 1.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.row == usize::MAX || self.col == usize::MAX {
+            return write!(f, "[NULL]");
+        }
         write!(f, "[{}:{}]", self.row + 1, self.col + 1)
     }
 }
@@ -64,7 +68,7 @@ impl Token {
         Token {
             kind: TokenType::None,
             val: vec![],
-            pos: Pos { row: usize::MAX - 1, col: usize::MAX - 1 },
+            pos: Pos { row: usize::MAX, col: usize::MAX },
         }
     }
 }
@@ -289,6 +293,7 @@ impl Lexer {
                     b'{' => tok.kind = TokenType::OpenScope,
                     b'}' => tok.kind = TokenType::CloseScope,
                     b';' => tok.kind = TokenType::End,
+                    b',' => tok.kind = TokenType::Separator,
                     b'0'..=b'9' => tok.kind = TokenType::LiteralInt,
                     b'A'..=b'z' => tok.kind = TokenType::Identifier,
                     _ => panic!("{} Error: Invalid token `{}`", tok.pos, tok.val_str()),
@@ -302,15 +307,15 @@ impl Lexer {
                     "&&"       => tok.kind = TokenType::OpLogicalAnd,
                     "||"       => tok.kind = TokenType::OpLogicalOr,
                     "exit"     => tok.kind = TokenType::KeywordExit,
-                    "func"     => tok.kind = TokenType::KeywordFunctionDecl,
                     "dump"     => tok.kind = TokenType::KeywordDebugDump,
                     "if"       => tok.kind = TokenType::KeywordIf,
                     "else"     => tok.kind = TokenType::KeywordElse,
-                    "let"      => tok.kind = TokenType::KeywordVariableDecl,
                     "for"      => tok.kind = TokenType::KeywordFor,
                     "while"    => tok.kind = TokenType::KeywordWhile,
                     "continue" => tok.kind = TokenType::KeywordContinue,
                     "break"    => tok.kind = TokenType::KeywordBreak,
+                    "return"   => tok.kind = TokenType::KeywordReturn,
+                    "i64"      => tok.kind = TokenType::TypeInt64,
                     _ => { // Then match variable contents of words
                         if tok.val.iter().all(|c| c.is_ascii_digit()) {
                             tok.kind = TokenType::LiteralInt;

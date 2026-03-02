@@ -14,11 +14,14 @@ if exists("b:current_syntax")
     finish
 endif
 
-set iskeyword=a-z,A-Z,_
+set iskeyword=a-z,A-Z,_,48-57
 syntax keyword langTodos TODO BUG NOTE
 
+" Types
+syntax keyword langTypes i64
+
 " Language Keywords 
-syntax keyword langKeywords if if* else func let exit dump continue break for
+syntax keyword langKeywords if if* else exit dump continue break for return 
 
 " Comments 
 syntax region langCommentLine start="//" end="$" contains=langTodos
@@ -30,6 +33,7 @@ syntax region langString start=/\v"/ skip=/\v\\./ end=/\v"/ contains=langEscapes
 syntax region langChar start=/\v'/ skip=/\v\\./ end=/\v'/ contains=langEscapes
 
 highlight default link langTodos Todo 
+highlight default link langTypes Type 
 highlight default link langKeywords Keyword 
 highlight default link langCommentLine Comment 
 highlight default link langString String
