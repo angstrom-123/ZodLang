@@ -35,23 +35,23 @@ See the examples folder in the project root for some programs showcasing the
 language.
 
 ## Features
-> [x] Compiling to native code
-> [x] Integer type
-> [x] Arithmetic with precedence
-> [x] Locally scoped variables
-> [x] Conditional if and else
-> [x] For and while loops
-> [x] Functions with params
-> [ ] Assignment arithmetic operators (e.g. +=)
-> [ ] Increment and decrement operators
-> [ ] Logical negation operator
-> [ ] Bitwise operators
-> [ ] Conditional elif
-> [ ] Ternary expressions
-> [ ] Compile-time type checking
-> [ ] Function param counting
-> [ ] Global variables 
-> [ ] String type
-> [ ] Character type
-> [ ] Structs 
-> [ ] Including other files
+- [x] Compiling to native code
+- [x] Integer type
+- [x] Arithmetic with precedence
+- [x] Locally scoped variables
+- [x] Conditional if and else
+- [x] For and while loops
+- [x] Functions with params
+- [ ] Assignment arithmetic operators (e.g. +=)
+- [ ] Increment and decrement operators
+- [ ] Logical negation operator
+- [ ] Bitwise operators
+- [ ] Conditional elif
+- [ ] Ternary expressions
+- [ ] Compile-time type checking
+- [ ] Function param counting
+- [ ] Global variables 
+- [ ] String type
+- [ ] Character type
+- [ ] Structs 
+- [ ] Including other files
