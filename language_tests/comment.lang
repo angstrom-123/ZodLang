@@ -1,12 +1,12 @@
 i64 main() {
-    dump 1;
-    dump 2;
-    // dump 3;
-    // dump 4;
-    dump 5;
-    dump 6;
-    // dump 7; dump 8;
-    dump 9;
-    dump 10;
-    exit 0;
+    dump(1);
+    dump(2);
+    // dump(3);
+    // dump(4);
+    dump(5);
+    dump(6);
+    // dump (7); dump (8);
+    dump(9);
+    dump(10);
+    exit(0);
 }

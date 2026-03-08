@@ -2,6 +2,8 @@ use std::fmt;
 
 #[derive(Debug)]
 #[derive(PartialEq)]
+#[derive(Eq)]
+#[derive(Hash)]
 #[derive(Clone)]
 pub enum TokenType {
     None,
@@ -18,7 +20,10 @@ pub enum TokenType {
     OpLessEqual,
     OpLogicalOr,
     OpLogicalAnd,
+    OpDereference,
     KeywordReturn,
+    KeywordMMap,
+    KeywordMUnmap,
     KeywordExit,
     KeywordDebugDump,
     KeywordIf,
@@ -28,6 +33,7 @@ pub enum TokenType {
     KeywordContinue,
     KeywordWhile,
     TypeInt64,
+    TypeInt64Ptr,
     End,
     Separator,
     OpenParen,
@@ -35,9 +41,54 @@ pub enum TokenType {
     OpenScope,
     CloseScope,
     Identifier,
-    LiteralInt,
+    Int,
+}
+impl TokenType {
+    pub fn val_str(&self) -> &'static str {
+        match self {
+            TokenType::None             => "",
+            TokenType::OpPlus           => "+",
+            TokenType::OpMinus          => "-",
+            TokenType::OpMul            => "*",
+            TokenType::OpDiv            => "/",
+            TokenType::OpAssign         => "=",
+            TokenType::OpEqual          => "==",
+            TokenType::OpNotEqual       => "!=",
+            TokenType::OpGreaterThan    => ">",
+            TokenType::OpLessThan       => "<",
+            TokenType::OpGreaterEqual   => ">=",
+            TokenType::OpLessEqual      => "<=",
+            TokenType::OpLogicalOr      => "||",
+            TokenType::OpLogicalAnd     => "&&",
+            TokenType::OpDereference    => "@",
+            TokenType::KeywordReturn    => "return",
+            TokenType::KeywordMMap      => "mmap",
+            TokenType::KeywordMUnmap    => "munmap",
+            TokenType::KeywordExit      => "exit",
+            TokenType::KeywordDebugDump => "dump",
+            TokenType::KeywordIf        => "if",
+            TokenType::KeywordElse      => "else",
+            TokenType::KeywordFor       => "for",
+            TokenType::KeywordBreak     => "break",
+            TokenType::KeywordContinue  => "continue",
+            TokenType::KeywordWhile     => "while",
+            TokenType::TypeInt64        => "i64",
+            TokenType::TypeInt64Ptr     => "i64^",
+            TokenType::End              => ";",
+            TokenType::Separator        => ",",
+            TokenType::OpenParen        => "(",
+            TokenType::CloseParen       => ")",
+            TokenType::OpenScope        => "{",
+            TokenType::CloseScope       => "}",
+            TokenType::Identifier       => "identifier",
+            TokenType::Int              => "literal int",
+        }
+    }
 }
 
+#[derive(PartialEq)]
+#[derive(Eq)]
+#[derive(Hash)]
 #[derive(Clone)]
 pub struct Pos {
     pub row: usize,
@@ -47,12 +98,25 @@ impl fmt::Display for Pos {
     // NOTE: Stored row and column are indices starting from 0, whereas in files, we count from 1.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.row == usize::MAX || self.col == usize::MAX {
-            return write!(f, "[NULL]");
+            return write!(f, "[NULL     ]");
         }
-        write!(f, "[{}:{}]", self.row + 1, self.col + 1)
+        write!(f, "[{:>4}:{:>4}]", self.row + 1, self.col + 1)
     }
 }
 
+impl Pos {
+    pub fn as_vec(&self) -> Vec<u8> {
+        let mut res: Vec<u8> = Vec::new();
+        res.append(&mut self.row.to_string().into_bytes());
+        res.push(b'_');
+        res.append(&mut self.col.to_string().into_bytes());
+        res
+    }
+}
+
+#[derive(PartialEq)]
+#[derive(Eq)]
+#[derive(Hash)]
 #[derive(Clone)]
 pub struct Token {
     pub kind: TokenType,
@@ -64,11 +128,26 @@ impl Token {
         String::from_utf8(self.val.clone()).expect("Error: Failed to convert token value to string")
     }
 
-    pub fn new_null() -> Self {
+    pub fn pos(&self) -> Pos {
+        Pos {
+            row: self.pos.row + 1,
+            col: self.pos.col + 1,
+        }
+    }
+
+    pub fn null() -> Self {
         Token {
             kind: TokenType::None,
             val: vec![],
             pos: Pos { row: usize::MAX, col: usize::MAX },
+        }
+    }
+
+    pub fn null_at(pos: Pos) -> Self {
+        Token {
+            kind: TokenType::None,
+            val: vec![],
+            pos,
         }
     }
 }
@@ -107,9 +186,31 @@ impl Lexer {
         tok.clone()
     }
 
-    pub fn previous_token(&mut self) -> Token {
-        let tok = self.toks.get(self.cur - 1).expect("Error: Lexer failed to peek previous token");
+    pub fn peek_next_token(&mut self) -> Token {
+        let tok = self.toks.get(self.cur + 1).expect("Error: Lexer failed to peek next token");
         tok.clone()
+    }
+
+    pub fn expect_tokens(&mut self, kinds: Vec<TokenType>) -> Token {
+        let tok = self.consume_token();
+        if kinds.contains(&tok.kind) {
+            return tok;
+        }
+
+        eprintln!("{} Error: Expected one of the following but got `{}`",  tok.pos, tok.val_str());
+        for kind in kinds {
+            eprintln!("    `{}`", kind.val_str());
+        }
+        panic!("");
+    }
+
+    pub fn expect_token(&mut self, kind: TokenType) -> Token {
+        let tok = self.consume_token();
+        if tok.kind == kind {
+            return tok;
+        }
+
+        panic!("{} Error: Expected `{}` but got `{}`",  tok.pos, kind.val_str(), tok.val_str());
     }
 
     pub fn dump_remaining_tokens(&mut self) {
@@ -154,7 +255,7 @@ impl Lexer {
 
                     lexeme.push(self.rune);
                 },
-                b';' | b'+' | b'-' | b'*' | b'(' | b')' | b'{' | b'}' => {
+                b'@' | b';' | b'+' | b'-' | b'*' | b'(' | b')' | b'{' | b'}' => {
                     if !lexeme.is_empty() {
                         self.toks.push(Token {
                             kind: TokenType::None,
@@ -172,7 +273,7 @@ impl Lexer {
                     });
                     lexeme.clear();
                 },
-                b'>' | b'<' | b'~' => {
+                b'>' | b'<' | b'!' => {
                     if !lexeme.is_empty() {
                         self.toks.push(Token {
                             kind: TokenType::None,
@@ -186,7 +287,7 @@ impl Lexer {
                 b'=' => {
                     if !lexeme.is_empty() {
                         let last: &u8 = lexeme.last().expect("Error: Failed to get last char in lexeme");
-                        if matches!(last, b'>' | b'<' | b'=' | b'~') {
+                        if matches!(last, b'>' | b'<' | b'=' | b'!') {
                             lexeme.push(self.rune);
                         } else {
                             self.toks.push(Token {
@@ -286,27 +387,29 @@ impl Lexer {
                     b'*' => tok.kind = TokenType::OpMul,
                     b'/' => tok.kind = TokenType::OpDiv,
                     b'=' => tok.kind = TokenType::OpAssign,
-                    b'(' => tok.kind = TokenType::OpenParen,
-                    b')' => tok.kind = TokenType::CloseParen,
                     b'>' => tok.kind = TokenType::OpGreaterThan,
                     b'<' => tok.kind = TokenType::OpLessThan,
+                    b'@' => tok.kind = TokenType::OpDereference,
+                    b'(' => tok.kind = TokenType::OpenParen,
+                    b')' => tok.kind = TokenType::CloseParen,
                     b'{' => tok.kind = TokenType::OpenScope,
                     b'}' => tok.kind = TokenType::CloseScope,
                     b';' => tok.kind = TokenType::End,
                     b',' => tok.kind = TokenType::Separator,
-                    b'0'..=b'9' => tok.kind = TokenType::LiteralInt,
+                    b'0'..=b'9' => tok.kind = TokenType::Int,
                     b'A'..=b'z' => tok.kind = TokenType::Identifier,
                     _ => panic!("{} Error: Invalid token `{}`", tok.pos, tok.val_str()),
                 }
             } else {
                 match tok.val_str().as_str() {
+                    // Ops
                     "=="       => tok.kind = TokenType::OpEqual,
-                    "~="       => tok.kind = TokenType::OpNotEqual,
+                    "!="       => tok.kind = TokenType::OpNotEqual,
                     ">="       => tok.kind = TokenType::OpGreaterEqual,
                     "<="       => tok.kind = TokenType::OpLessEqual,
                     "&&"       => tok.kind = TokenType::OpLogicalAnd,
                     "||"       => tok.kind = TokenType::OpLogicalOr,
-                    "exit"     => tok.kind = TokenType::KeywordExit,
+                    // Keywords
                     "dump"     => tok.kind = TokenType::KeywordDebugDump,
                     "if"       => tok.kind = TokenType::KeywordIf,
                     "else"     => tok.kind = TokenType::KeywordElse,
@@ -315,11 +418,22 @@ impl Lexer {
                     "continue" => tok.kind = TokenType::KeywordContinue,
                     "break"    => tok.kind = TokenType::KeywordBreak,
                     "return"   => tok.kind = TokenType::KeywordReturn,
+                    // Syscalls (pending proper syscall keyword - I need more data types)
+                    "exit"     => tok.kind = TokenType::KeywordExit,
+                    "mmap"     => tok.kind = TokenType::KeywordMMap,
+                    "munmap"   => tok.kind = TokenType::KeywordMUnmap,
+                    // Types
                     "i64"      => tok.kind = TokenType::TypeInt64,
+                    "i64^"     => tok.kind = TokenType::TypeInt64Ptr,
                     _ => { // Then match variable contents of words
                         if tok.val.iter().all(|c| c.is_ascii_digit()) {
-                            tok.kind = TokenType::LiteralInt;
+                            tok.kind = TokenType::Int;
                         } else if first.is_ascii_alphabetic() {
+                            for c in &tok.val {
+                                if matches!(c, b'"' | b'$' | b'%' | b'^' | b'&' | b'~' | b'#' | b'\\' | b',' | b'.' | b'`') {
+                                    panic!("{} Error: Invalid token `{}` in identifier", tok.pos, String::from_utf8(vec![*c]).expect("Error: Failed to convert char to str"));
+                                }
+                            }
                             tok.kind = TokenType::Identifier;
                         } else {
                             panic!("{} Error: Invalid token `{}`", tok.pos, tok.val_str());

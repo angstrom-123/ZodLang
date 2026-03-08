@@ -1,60 +1,60 @@
 i64 main() {
     if 2 >1 {
-        dump 1;
-        dump 2;
+        dump(1);
+        dump(2);
     }
 
     if 5 <= 5 {
-        dump 3;
+        dump(3);
     }
 
     if 0 >= 0 {
-        dump 4;
+        dump(4);
     }
 
     if 3 == 3 { 
-        dump 5; 
+        dump(5); 
     }
 
-    if 5 ~= 6 { 
-        dump 6; 
+    if 5 != 6 { 
+        dump(6); 
     }
 
     if 10 < 20 && 20 < 100 { 
-        dump 7;
+        dump(7);
     }
     
     if 10 < 20 || 20 > 100 { 
-        dump 8; 
+        dump(8); 
     }
 
     if 10 < 20 && 20 < 100 || 20 > 100 && 100 == 23 { 
-        dump 9; 
+        dump(9); 
     }
 
     if 8 * 4 > 7 * 4 {
-        dump 10;
+        dump(10);
     }
 
     if 0 * 9 > 20 {
-        dump 0;
+        dump(0);
     } else {
-        dump 11;
+        dump(11);
     }
 
     i64 a = 10;
     i64 b = 20;
     if a < b && a == 10 || b == 10 {
-        dump 12;
+        dump(12);
     }
 
     if (1 || 0) && 1 {
-        dump 13;
+        dump(13);
     }
 
     if 1 || (0 && 1) {
-        dump 14;
+        dump(14);
     }
 
-    exit 0;
+    exit(0);
 }

@@ -1,43 +1,96 @@
 use crate::lexer::Lexer;
 use crate::lexer::Token;
 use crate::lexer::TokenType;
-use crate::lexer::Pos;
+
+// <Prog>           : { <Func-Decl> }
+// <Var-Decl>       : <Type> <Ident> [ "=" <Additive> ]
+// <Func-Decl>      : <Type> <Ident> "(" [ <Type> <Ident> { "," <Type> <Ident> } ] ")" "{" { <Statement> } "}"
+// <Func-Call>      : <Ident> "(" [ <Union> { "," <Union> } ] ")" | "mmap" "(" <Additive> ")"
+// <Type>           : "i64" | "i64^"
+// <Assign>         : [ "@" ] <Ident> "=" <Additive> | "@" "(" <Additive> ")" "=" <Additive>
+// <Statement>      : "dump" <Additive> ";"
+//                  | "exit" "(" <Additive> ")" ";"
+//                  | "return" <Additive> ";"
+//                  | "break" ";"
+//                  | "continue" ";"
+//                  | "for" [ ( <Var-Decl> | <Assign> ) ] ";" [ <Union> ] ";" ( <Assign> | Func-Call ) "{" { <Statement> } "}"
+//                  | "while" <Union> "{" { <Statement> } "}"
+//                  | "if" <Union> "{" { <Statement> } "}" [ "else" "{" { <Statement> } "}" ]
+//                  | <Var-Decl> ";"
+//                  | <Func-Call> ";"
+//                  | <Assign> ";"
+// <Union>          : <Intersection> [ "||" <Intersection> ]
+// <Intersection>   : <Equality>     [ "&&" <Equality> ]
+// <Equality>       : <Relational> [ ( "==" | "!=" ) <Relational> ]
+// <Relational>     : <Additive>   [ ( "<" | ">" | "<=" | ">=" ) <Additive> ]
+// <Additive>       : <Term>       [ ( "+" | "-" ) <Term> ]
+// <Term>           : <Factor>     [ ( "*" | "/" ) <Factor> ]
+// <Factor>         : <Literal-Int> | <Func-Call> | "(" <Union> ")" | <Unary> <Factor> | <Ident>
+// <Unary>          : "-" | "@"
+
+#[derive(Debug)]
+#[derive(Clone)]
+#[derive(PartialEq)]
+#[derive(Eq)]
+#[derive(Hash)]
+pub enum DataType {
+    None,
+    Unknown,
+    I64,
+    I64Ptr,
+}
+impl DataType {
+    pub fn from_token(tok: &Token) -> DataType {
+        match tok.kind {
+            TokenType::TypeInt64 => DataType::I64,
+            TokenType::TypeInt64Ptr => DataType::I64Ptr,
+            _ => panic!("{} Error: Failed to convert token `{}` to datatype", tok.pos, tok.val_str())
+        }
+    }
+}
 
 #[derive(Debug)]
 #[derive(Clone)]
 #[derive(PartialEq)]
 pub enum NodeType {
     Null,
-    Program,
-    Block,
-    Return,
-    Exit,
-    FuncDecl,
-    FuncCall,
-    VarDecl,
+    Group,
     Var,
+    LiteralInt,
+    FuncCall,
+    FuncDecl,
+    VarDecl,
     Assign,
-    DebugDump,
-    BinOp,
-    UnOp,
     Conditional,
     ForLoop,
     WhileLoop,
-    Literal,
-    Break,
+    DebugDump,
+    Exit,
+    MMap,
+    MUnmap,
+    Return,
     Continue,
+    Break,
+    BinaryOp,
+    UnaryOp,
+
+
+
+
+    DerefAssign,
 }
 
 #[derive(Clone)]
 pub struct ParseNode {
     pub kind:     NodeType,
+    pub datatype: DataType,
     pub tok:      Token,
     pub children: Vec<ParseNode>,
 }
 impl ParseNode {
     pub fn dump(&self, _depth: usize) {
-        let tok_str: String = String::from_utf8(self.tok.val.clone()).expect("Error: Failed to convert token value to string");
-        eprintln!("{}: {:padding$}\x1b[94m* {:?}\x1b[0m (\x1b[92m{:?}\x1b[0m: `{}`)", self.tok.pos, "", self.kind, self.tok.kind, tok_str, padding = _depth);
+        eprintln!("{}: {:padding$}\x1b[94m* {:?}\x1b[0m (\x1b[92m{:?}::{:?}\x1b[0m: `{}`)", self.tok.pos, "", self.kind, self.tok.kind, self.datatype, self.tok.val_str(), padding = _depth);
+
         for child in &self.children {
             child.dump(_depth + 4);
         }
@@ -60,210 +113,255 @@ impl ParseNode {
         res
     }
 
-    fn new_program(prog_name: String, prog: Vec<ParseNode>) -> Self {
+    fn _zero_literal() -> Self {
+        let mut tok: Token = Token::null();
+        tok.val = vec![b'0'];
         ParseNode {
-            kind: NodeType::Program,
-            tok: Token {
-                kind: TokenType::None,
-                val: prog_name.into_bytes(),
-                pos: Pos { row: usize::MAX, col: usize::MAX },
-            },
-            children: prog
+            kind: NodeType::LiteralInt,
+            datatype: DataType::I64,
+            tok,
+            children: vec![],
         }
     }
 
-    fn new_exit(tok: Token, rhs: ParseNode) -> Self {
+    fn _null() -> Self {
         ParseNode {
-            kind: NodeType::Exit,
+            kind: NodeType::Null,
+            datatype: DataType::None,
+            tok: Token::null(),
+            children: vec![],
+        }
+    }
+
+    fn _group(nodes: Vec<ParseNode>) -> Self {
+        let tok: Token = if let Some(node) = nodes.first() {
+            Token::null_at(node.tok.pos.clone())
+        } else {
+            Token::null()
+        };
+        ParseNode {
+            kind: NodeType::Group,
+            datatype: DataType::None,
             tok,
-            children: vec![rhs],
+            children: nodes
+        }
+    }
+
+    fn _literal_int(tok: Token) -> Self {
+        ParseNode {
+            kind: NodeType::LiteralInt,
+            datatype: DataType::I64,
+            tok,
+            children: vec![]
+        }
+    }
+
+    fn _continue(tok: Token) -> Self {
+        ParseNode {
+            kind: NodeType::Continue,
+            datatype: DataType::None,
+            tok,
+            children: vec![]
         }
     }
     
-    fn new_return(tok: Token, rhs: ParseNode) -> Self {
+    fn _break(tok: Token) -> Self {
         ParseNode {
-            kind: NodeType::Return,
+            kind: NodeType::Break,
+            datatype: DataType::None,
             tok,
-            children: vec![rhs],
+            children: vec![]
         }
     }
 
-    fn new_debug_dump(tok: Token, rhs: ParseNode) -> Self {
+    fn _dump(tok: Token, rhs: ParseNode) -> Self {
         ParseNode {
             kind: NodeType::DebugDump,
+            datatype: DataType::None,
             tok,
-            children: vec![rhs],
+            children: vec![rhs]
         }
     }
 
-    fn new_bin_op(tok: Token, lhs: ParseNode, rhs: ParseNode) -> Self {
+    fn _return(tok: Token, rhs: ParseNode) -> Self {
         ParseNode {
-            kind: NodeType::BinOp,
+            kind: NodeType::Return,
+            datatype: DataType::Unknown,
             tok,
+            children: vec![rhs]
+        }
+    }
+
+    fn _exit(tok: Token, rhs: ParseNode) -> Self {
+        ParseNode {
+            kind: NodeType::Exit,
+            datatype: DataType::None,
+            tok,
+            children: vec![rhs]
+        }
+    }
+
+    fn _munmap(tok: Token, rhs: Vec<ParseNode>) -> Self {
+        ParseNode {
+            kind: NodeType::MUnmap,
+            datatype: DataType::I64,
+            tok,
+            children: rhs
+        }
+    }
+
+    fn _mmap(tok: Token, rhs: ParseNode) -> Self {
+        ParseNode {
+            kind: NodeType::MMap,
+            datatype: DataType::I64Ptr,
+            tok,
+            children: vec![rhs]
+        }
+    }
+
+    fn _var_decl(datatype: DataType, ident: Token) -> Self {
+        ParseNode {
+            kind: NodeType::VarDecl,
+            datatype,
+            tok: ident,
+            children: vec![],
+        }
+    }
+
+    fn _var(ident: Token) -> Self {
+        ParseNode {
+            kind: NodeType::Var,
+            datatype: DataType::Unknown,
+            tok: ident,
+            children: vec![],
+        }
+    }
+
+    fn _func_decl(datatype: DataType, ident: Token, args: Vec<ParseNode>, body: Vec<ParseNode>) -> Self {
+        ParseNode {
+            kind: NodeType::FuncDecl,
+            datatype,
+            tok: ident,
+            children: vec![Self::_group(args), Self::_group(body)],
+        }
+    }
+
+    fn _func_call(ident: Token, args: Vec<ParseNode>) -> Self {
+        ParseNode {
+            kind: NodeType::FuncCall,
+            datatype: DataType::Unknown,
+            tok: ident,
+            children: args,
+        }
+    }
+
+    fn _binary_op(operator: Token, lhs: ParseNode, rhs: ParseNode) -> Self {
+        ParseNode {
+            kind: NodeType::BinaryOp,
+            datatype: DataType::None,
+            tok: operator,
             children: vec![lhs, rhs],
         }
     }
 
-    fn new_un_op(tok: Token, rhs: ParseNode) -> Self {
+    fn _unary_op(operator: Token, rhs: ParseNode) -> Self {
         ParseNode {
-            kind: NodeType::UnOp,
-            tok,
+            kind: NodeType::UnaryOp,
+            datatype: DataType::None,
+            tok: operator,
             children: vec![rhs],
         }
     }
 
-    fn new_literal(tok: Token) -> Self {
-        ParseNode {
-            kind: NodeType::Literal,
-            tok,
-            children: Vec::new(),
-        }
-    }
-
-    fn new_func_decl(ident_tok: Token, params: Vec<ParseNode>, body: ParseNode) -> Self {
-        let mut children: Vec<ParseNode> = params.clone();
-        children.push(body);
-        ParseNode {
-            kind: NodeType::FuncDecl,
-            tok: ident_tok,
-            children,
-        }
-    }
-
-    fn new_func_call(tok: Token, params: Vec<ParseNode>) -> Self {
-        ParseNode {
-            kind: NodeType::FuncCall,
-            tok,
-            children: params,
-        }
-    }
-
-    fn new_assign(ident_tok: Token, rhs: ParseNode) -> Self {
+    fn _assign(operator: Token, lhs: ParseNode, rhs: ParseNode) -> Self {
         ParseNode {
             kind: NodeType::Assign,
-            tok: ident_tok,
-            children: vec![rhs],
+            datatype: DataType::None,
+            tok: operator,
+            children: vec![lhs, rhs],
         }
     }
 
-    fn new_var(ident_tok: Token) -> Self {
-        ParseNode {
-            kind: NodeType::Var,
-            tok: ident_tok,
-            children: vec![],
+    fn _conditional(ident: Token, cond: ParseNode, if_body: Vec<ParseNode>, else_body: Vec<ParseNode>) -> Self {
+        let mut res: ParseNode = ParseNode {
+            kind: NodeType::Conditional,
+            datatype: DataType::None,
+            tok: ident,
+            children: vec![cond, Self::_group(if_body)],
+        };
+
+        if !else_body.is_empty() {
+            res.children.push(Self::_group(else_body));
         }
+
+        res
     }
 
-    fn new_var_decl(ident_tok: Token, rhs: Option<ParseNode>) -> Self {
-        match rhs {
-            None => {
-                let init_tok: Token = Token {
-                    kind: TokenType::LiteralInt,
-                    val: vec![b'0'],
-                    pos: Pos { col: usize::MAX, row: usize::MAX },
-                };
-                ParseNode {
-                    kind: NodeType::VarDecl,
-                    tok: ident_tok,
-                    children: vec![ParseNode::new_literal(init_tok)],
-                }
-            },
-            Some(rhs) => {
-                ParseNode {
-                    kind: NodeType::VarDecl,
-                    tok: ident_tok,
-                    children: vec![rhs],
-                }
-            }
-        }
-    }
-
-    fn new_block(body: Vec<ParseNode>) -> Self {
-        ParseNode {
-            kind: NodeType::Block,
-            tok: Token::new_null(),
-            children: body,
-        }
-    }
-
-    fn new_conditional(tok: Token, cond: ParseNode, if_block: ParseNode, else_block: Option<ParseNode>) -> Self {
-        match else_block {
-            None => {
-                ParseNode {
-                    kind: NodeType::Conditional,
-                    tok,
-                    children: vec![cond, if_block],
-                }
-            },
-            Some(else_block) => {
-                ParseNode {
-                    kind: NodeType::Conditional,
-                    tok,
-                    children: vec![cond, if_block, else_block],
-                }
-            }
-        }
-    }
-
-    fn new_null() -> Self {
-        ParseNode {
-            kind: NodeType::Null,
-            tok: Token::new_null(),
-            children: vec![],
-        }
-    }
-
-    fn new_for_loop(tok: Token, init: Option<ParseNode>, cond: Option<ParseNode>, post: Option<ParseNode>, body_block: ParseNode) -> Self {
-        let children: Vec<ParseNode> = vec![
-            init.unwrap_or(ParseNode::new_null()),
-            cond.unwrap_or(ParseNode::new_null()),
-            post.unwrap_or(ParseNode::new_null()),
-            body_block,
-        ];
+    fn _for(ident: Token, decl: Option<ParseNode>, init: Option<ParseNode>, cond: Option<ParseNode>, post: Option<ParseNode>, body: Vec<ParseNode>) -> Self {
         ParseNode {
             kind: NodeType::ForLoop,
-            tok,
-            children,
+            datatype: DataType::None,
+            tok: ident,
+            children: vec![
+                decl.unwrap_or(Self::_null()),
+                init.unwrap_or(Self::_null()),
+                cond.unwrap_or(Self::_null()),
+                post.unwrap_or(Self::_null()),
+                Self::_group(body)
+            ],
         }
     }
 
-    fn new_while_loop(tok: Token, cond: ParseNode, body_block: ParseNode) -> Self {
+    fn _while(ident: Token, cond: ParseNode, body: Vec<ParseNode>) -> Self {
         ParseNode {
             kind: NodeType::WhileLoop,
-            tok,
-            children: vec![cond, body_block],
-        }
-    }
-
-    fn new_break(tok: Token) -> Self {
-        ParseNode {
-            kind: NodeType::Break,
-            tok,
-            children: vec![],
-        }
-    }
-
-    fn new_continue(tok: Token) -> Self {
-        ParseNode {
-            kind: NodeType::Continue,
-            tok,
-            children: vec![],
+            datatype: DataType::None,
+            tok: ident,
+            children: vec![cond, Self::_group(body)],
         }
     }
 }
 
-pub struct ParseTree {
-    pub root: ParseNode
+pub enum Precedence {
+    Union           = 0,
+    Intersection    = 1,
+    Equality        = 2,
+    Relational      = 3,
+    Additive        = 4,
+    Term            = 5,
+    Factor          = 6,
+    _Count
 }
-impl ParseTree {
-    pub fn new(prog_name: String) -> Self {
-        ParseTree { root: ParseNode::new_program(prog_name, Vec::new()) }
+
+pub struct ParseTree<'a> {
+    pub root: ParseNode,
+    pub precedence: &'a[&'a[TokenType]; Precedence::_Count as usize],
+}
+
+impl<'a> Default for ParseTree<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+impl <'a> ParseTree<'a> {
+    pub fn new() -> Self {
+        let root: ParseNode = ParseNode::_group(Vec::new());
+        let precedence: &[&[TokenType]; Precedence::_Count as usize] = &[
+            &[TokenType::OpLogicalOr],
+            &[TokenType::OpLogicalAnd],
+            &[TokenType::OpEqual, TokenType::OpNotEqual],
+            &[TokenType::OpGreaterThan, TokenType::OpGreaterEqual, TokenType::OpLessThan, TokenType::OpLessEqual],
+            &[TokenType::OpPlus, TokenType::OpMinus],
+            &[TokenType::OpMul, TokenType::OpDiv],
+            &[]
+        ];
+        ParseTree { root, precedence }
     }
 
     pub fn construct(&mut self, lexer: &mut Lexer) {
         let mut children: Vec<ParseNode> = Vec::new();
         while lexer.has_token() {
-            children.push(self.parse_function(lexer));
+            children.push(self.parse_func_decl(lexer));
         }
         self.root.children = children;
     }
@@ -276,460 +374,360 @@ impl ParseTree {
         self.root.post_order()
     }
 
-    /* Production Rules:
-     *
-     * <program>    ::= { <function> }
-     * <function>   ::= "i64" <id> "{" { <block_item> } "}"
-     * <block_item> ::= <statement> | <var_decl>
-     * <statement>  ::= "dump" <add_expr> ";" 
-     *                | "exit" <add_expr> ";" 
-     *                | "return" <add_expr> ";" 
-     *                | "break" ";"
-     *                | "continue" ";"
-     *                | <func_call> ";"
-     *                | <id> "=" <add_expr> ";"
-     *                | "if" <or_expr> "{" { <block_item> } "}" [ "else" "{" { <block_item> } "}"
-     *                | "for" [ <var_decl> | <or_expr> ] ";" [ <or_expr> ] ";" [ <or_expr> ] "{" { <block_item> } "}"
-     *                | "while" <or_expr> "{" { <block_item> } "}"
-     * <func_decl>  ::= "i64" <id> "(" [ "i64" <id> { "," "i64" <id> } ] ")" "{" { <block_item } "}"
-     * <func_call>  ::= <id> "(" [ <or_expr> { "," <or_expr> } ] ")"
-     * <var_decl>   ::= "i64" <id> [ "=" <add_expr> ] ";"
-     * <or_expr>    ::= <and_expr> { "||" <and_expr> }
-     * <and_expr>   ::= <equ_expr> { "&&" <equ_expr> }
-     * <equ_expr>   ::= <rel_expr> { ("==" | "~=") <rel_expr> }
-     * <rel_expr>   ::= <add_expr> { ("<" | ">" | "<=" | ">=") <add_expr> }
-     * <add_expr>   ::= <term> { ("+" | "-") <term> }
-     * <term>       ::= <factor> { ("*" | "/") <factor> }
-     * <factor>     ::= <func_call> | "(" <or_expr> ")" | <unary_op> <factor> | <int> | <id>
-     * <unary_op>   ::= "-"
-     */
+    // <Func-Decl> : <Type> <Var> "(" [ <Type> <Var> { "," <Type> <Var> } ] ")" "{" { <Statement> } "}"
+    fn parse_func_decl(&mut self, lexer: &mut Lexer) -> ParseNode {
+        let datatype: DataType = DataType::from_token(&lexer.expect_tokens(vec![TokenType::TypeInt64, TokenType::TypeInt64Ptr]));
+        let ident: Token = lexer.expect_token(TokenType::Identifier);
 
-    fn parse_factor(&mut self, lexer: &mut Lexer) -> ParseNode {
-        let mut tok: Token = lexer.consume_token();
-        match tok.kind {
-            TokenType::LiteralInt => ParseNode::new_literal(tok),
-            TokenType::Identifier => {
-                if lexer.peek_token().kind == TokenType::OpenParen {
-                    lexer.consume_token();
-
-                    let mut params: Vec<ParseNode> = Vec::new();
-                    let mut next_tok: Token = lexer.peek_token();
-                    while next_tok.kind != TokenType::CloseParen {
-                        if next_tok.kind == TokenType::Separator {
-                            if params.is_empty() {
-                                panic!("{} Error: Expected `,` but got `{}`", next_tok.pos, next_tok.val_str());
-                            } else {
-                                lexer.consume_token();
-                            }
-                        }
-
-                        params.push(self.parse_or_expr(lexer));
-                        next_tok = lexer.peek_token();
-                    }
-                    lexer.consume_token();
-                    params.reverse();
-                    ParseNode::new_func_call(tok, params)
-                } else {
-                    ParseNode::new_var(tok)
-                }
-            },
-            TokenType::OpMinus => { // Unary minus
-                let factor: ParseNode = self.parse_factor(lexer);
-                ParseNode::new_un_op(tok, factor)
-            },
-            TokenType::OpenParen => {
-                let expression: ParseNode = self.parse_or_expr(lexer);
-                tok = lexer.consume_token();
-                if tok.kind != TokenType::CloseParen {
-                    panic!("{} Error: Expected `)` but got `{}`", tok.pos, tok.val_str());
-                }
-                expression
-            },
-            _ => panic!("{} Error: Invalid factor `{}`", tok.pos, tok.val_str())
-        }
-    }
-
-    fn parse_term(&mut self, lexer: &mut Lexer) -> ParseNode {
-        let mut factor: ParseNode = self.parse_factor(lexer);
-        let mut tok: Token = lexer.peek_token();
-        while matches!(tok.kind, TokenType::OpMul | TokenType::OpDiv) {
-            lexer.consume_token();
-            let next_factor: ParseNode = self.parse_factor(lexer);
-            factor = ParseNode::new_bin_op(tok, factor, next_factor);
-            tok = lexer.peek_token();
-        }
-
-        factor
-    }
-
-    fn parse_add_expr(&mut self, lexer: &mut Lexer) -> ParseNode {
-        let mut term: ParseNode = self.parse_term(lexer);
-        let mut tok: Token = lexer.peek_token();
-        while matches!(tok.kind, TokenType::OpPlus | TokenType::OpMinus) {
-            lexer.consume_token();
-            let next_term: ParseNode = self.parse_term(lexer);
-            term = ParseNode::new_bin_op(tok, term, next_term);
-            tok = lexer.peek_token();
-        }
-
-        term
-    }
-
-    fn parse_or_expr(&mut self, lexer: &mut Lexer) -> ParseNode {
-        let mut and: ParseNode = self.parse_and_expr(lexer);
-        let mut tok: Token = lexer.peek_token();
-        while matches!(tok.kind, TokenType::OpLogicalOr) {
-            lexer.consume_token();
-            let next_and: ParseNode = self.parse_and_expr(lexer);
-            and = ParseNode::new_bin_op(tok, and, next_and);
-            tok = lexer.peek_token();
-        }
-
-        and
-    }
-
-    fn parse_and_expr(&mut self, lexer: &mut Lexer) -> ParseNode {
-        let mut equ: ParseNode = self.parse_equ_expr(lexer);
-        let mut tok: Token = lexer.peek_token();
-        while matches!(tok.kind, TokenType::OpLogicalAnd) {
-            lexer.consume_token();
-            let next_equ: ParseNode = self.parse_equ_expr(lexer);
-            equ = ParseNode::new_bin_op(tok, equ, next_equ);
-            tok = lexer.peek_token();
-        }
-
-        equ
-    }
-
-    fn parse_equ_expr(&mut self, lexer: &mut Lexer) -> ParseNode {
-        let mut rel: ParseNode = self.parse_rel_expr(lexer);
-        let mut tok: Token = lexer.peek_token();
-        while matches!(tok.kind, TokenType::OpEqual | TokenType::OpNotEqual) {
-            lexer.consume_token();
-            let next_rel: ParseNode = self.parse_rel_expr(lexer);
-            rel = ParseNode::new_bin_op(tok, rel, next_rel);
-            tok = lexer.peek_token();
-        }
-
-        rel
-    }
-
-    fn parse_rel_expr(&mut self, lexer: &mut Lexer) -> ParseNode {
-        let mut add: ParseNode = self.parse_add_expr(lexer);
-        let mut tok: Token = lexer.peek_token();
-        while matches!(tok.kind, TokenType::OpGreaterThan | TokenType::OpGreaterEqual | TokenType::OpLessThan | TokenType::OpLessEqual) {
-            lexer.consume_token();
-            let next_add: ParseNode = self.parse_add_expr(lexer);
-            add = ParseNode::new_bin_op(tok, add, next_add);
-            tok = lexer.peek_token();
-        }
-
-        add
-    }
-
-    fn parse_function(&mut self, lexer: &mut Lexer) -> ParseNode {
-        let mut tok: Token = lexer.consume_token();
-        if tok.kind != TokenType::TypeInt64 {
-            panic!("{} Error: Expected function type but got `{}`", tok.pos, tok.val_str());
-        }
-        tok = lexer.consume_token();
-        if tok.kind != TokenType::Identifier {
-            panic!("{} Error: Expected identifier but got `{}`", tok.pos, tok.val_str());
-        }
-        let mut next_tok: Token = lexer.consume_token();
-        if next_tok.kind != TokenType::OpenParen {
-            panic!("{} Error: Expected `(` but got `{}`", next_tok.pos, next_tok.val_str());
-        }
+        // Function arguments between parens
+        lexer.expect_token(TokenType::OpenParen);
 
         let mut args: Vec<ParseNode> = Vec::new();
-        next_tok = lexer.peek_token();
-        while next_tok.kind != TokenType::CloseParen {
-            next_tok = lexer.consume_token();
+        while lexer.peek_token().kind != TokenType::CloseParen {
             if !args.is_empty() {
-                if next_tok.kind != TokenType::Separator {
-                    panic!("{} Error: Expected `,` but got `{}`", next_tok.pos, next_tok.val_str());
-                }
-                next_tok = lexer.consume_token();
+                lexer.expect_token(TokenType::Separator);
             }
-
-            if next_tok.kind != TokenType::TypeInt64 {
-                panic!("{} Error: Expected type but got `{}`", next_tok.pos, next_tok.val_str());
-            }
-            next_tok = lexer.consume_token();
-            if next_tok.kind != TokenType::Identifier {
-                panic!("{} Error: Expected identifier but got `{}`", next_tok.pos, next_tok.val_str());
-            }
-            args.push(ParseNode::new_var(next_tok));
-            next_tok = lexer.peek_token();
+            let arg_type: DataType = DataType::from_token(&lexer.expect_tokens(vec![TokenType::TypeInt64, TokenType::TypeInt64Ptr]));
+            let arg_ident: Token = lexer.expect_token(TokenType::Identifier);
+            args.push(ParseNode::_var_decl(arg_type, arg_ident));
         }
-        lexer.consume_token();
 
-        let mut next_tok: Token = lexer.consume_token();
-        if next_tok.kind != TokenType::OpenScope {
-            panic!("{} Error: Expected `{{` but got `{}`", next_tok.pos, next_tok.val_str());
-        }
+        lexer.expect_token(TokenType::CloseParen);
+
+        // Function body between scopes
+        lexer.expect_token(TokenType::OpenScope);
+
         let mut body: Vec<ParseNode> = Vec::new();
-        while next_tok.kind != TokenType::CloseScope {
-            body.push(self.parse_block_item(lexer));
-            next_tok = lexer.peek_token();
+        while lexer.peek_token().kind != TokenType::CloseScope {
+            body.extend(self.parse_statement(lexer));
         }
-        lexer.consume_token();
 
-        ParseNode::new_func_decl(tok, args, ParseNode::new_block(body))
+        lexer.expect_token(TokenType::CloseScope);
+
+        ParseNode::_func_decl(datatype, ident, args, body)
     }
 
-    fn parse_block_item(&mut self, lexer: &mut Lexer) -> ParseNode {
-        let tok: Token = lexer.peek_token();
-        match tok.kind {
-            TokenType::TypeInt64 => {
-                self.parse_decl(lexer)
-            },
-            TokenType::KeywordFor | TokenType::KeywordIf | TokenType::KeywordExit | TokenType::KeywordReturn |
-            TokenType::KeywordDebugDump | TokenType::Identifier | TokenType::KeywordBreak | 
-            TokenType::KeywordContinue | TokenType::KeywordWhile => {
-                self.parse_statement(lexer)
-            },
-            _ => panic!("{} Error: Expected block item but got `{}`", tok.pos, tok.val_str())
-        }
-    }
+    // <Func-Call> : <Ident> "(" [ <Union> { "," <Union> } ] ")" | "mmap" "(" <Additive> ")"
+    fn parse_func_call(&mut self, lexer: &mut Lexer) -> ParseNode {
+        let ident: Token = lexer.expect_tokens(vec![TokenType::Identifier, TokenType::KeywordMMap, TokenType::KeywordDebugDump, 
+                                                    TokenType::KeywordExit, TokenType::KeywordMUnmap]);
 
-    fn parse_decl(&mut self, lexer: &mut Lexer) -> ParseNode {
-        let tok: Token = lexer.consume_token();
-        if tok.kind != TokenType::TypeInt64 {
-            panic!("{} Error: Expected `let` but got `{}`", tok.pos, tok.val_str());
-        }
-        let ident_tok: Token = lexer.consume_token();
-        if ident_tok.kind != TokenType::Identifier {
-            panic!("{} Error: Expected identifier but got `{}`", ident_tok.pos, ident_tok.val_str());
-        }
-        let mut next_tok: Token = lexer.consume_token();
-        if next_tok.kind == TokenType::End {
-            return ParseNode::new_var_decl(ident_tok, None);
+        // Function arguments between parens
+        lexer.expect_token(TokenType::OpenParen);
+
+        let mut args: Vec<ParseNode> = Vec::new();
+        while lexer.peek_token().kind != TokenType::CloseParen {
+            if !args.is_empty() {
+                lexer.expect_token(TokenType::Separator);
+            }
+            args.push(self.parse_expression(lexer, Precedence::Union as usize));
         }
 
-        if next_tok.kind != TokenType::OpAssign {
-            panic!("{} Error: Expected `=` or `;` but got `{}`", next_tok.pos, next_tok.val_str());
-        } 
-        let expression: ParseNode = self.parse_add_expr(lexer);
-        next_tok = lexer.consume_token();
-        if next_tok.kind != TokenType::End {
-            panic!("{} Error: Expected `;` but got `{}`", next_tok.pos, next_tok.val_str());
-        }
-        ParseNode::new_var_decl(ident_tok, Some(expression))
-    }
+        lexer.expect_token(TokenType::CloseParen);
 
-    fn parse_statement(&mut self, lexer: &mut Lexer) -> ParseNode {
-        let tok: Token = lexer.consume_token();
-        match tok.kind {
-            TokenType::KeywordBreak => {
-                let next_tok = lexer.consume_token();
-                if next_tok.kind != TokenType::End {
-                    panic!("{} Error: Expected `;` but got `{}`", next_tok.pos, next_tok.val_str());
-                }
-                ParseNode::new_break(tok)
-            },
-            TokenType::KeywordContinue => {
-                let next_tok = lexer.consume_token();
-                if next_tok.kind != TokenType::End {
-                    panic!("{} Error: Expected `;` but got `{}`", next_tok.pos, next_tok.val_str());
-                }
-                ParseNode::new_continue(tok)
-            },
-            TokenType::KeywordWhile => {
-                let expression: ParseNode = self.parse_or_expr(lexer);
-                let mut next_tok = lexer.consume_token();
-                if next_tok.kind != TokenType::OpenScope {
-                    panic!("{} Error: Expected `{{` but got `{}`", next_tok.pos, next_tok.val_str());
-                }
+        args.reverse();
 
-                let mut body: Vec<ParseNode> = Vec::new();
-                next_tok = lexer.peek_token();
-                while next_tok.kind != TokenType::CloseScope {
-                    body.push(self.parse_block_item(lexer));
-                    next_tok = lexer.peek_token();
-                }
-                lexer.consume_token();
-
-                ParseNode::new_while_loop(tok, expression, ParseNode::new_block(body))
-            },
-            TokenType::KeywordFor => {
-                let init: Option<ParseNode>;
-                let mut next_tok: Token = lexer.peek_token();
-                match next_tok.kind {
-                    TokenType::End => {
-                        lexer.consume_token();
-                        init = None;
-                    },
-                    TokenType::TypeInt64 => init = Some(self.parse_decl(lexer)),
-                    TokenType::Identifier => {
-                        let ident_tok: Token = lexer.consume_token();
-                        next_tok = lexer.consume_token();
-                        if next_tok.kind != TokenType::OpAssign {
-                            panic!("{} Error: Expected `=` but got `{}`", next_tok.pos, next_tok.val_str());
-                        }
-
-                        let expression: ParseNode = self.parse_add_expr(lexer);
-                        next_tok = lexer.consume_token();
-                        if next_tok.kind != TokenType::End {
-                            panic!("{} Error: Expected `;` but got `{}`", next_tok.pos, next_tok.val_str());
-                        }
-
-                        init = Some(ParseNode::new_assign(ident_tok, expression));
-                    },
-                    _ => {
-                        panic!("{} Error: Unexpected initializer in for loop `{}`", next_tok.pos, next_tok.val_str());
-                    },
-                }
-
-                let cond: Option<ParseNode>;
-                next_tok = lexer.peek_token();
-                if next_tok.kind == TokenType::End {
-                    lexer.consume_token();
-                    cond = None;
+        match ident.kind {
+            TokenType::KeywordMMap => {
+                if let Some(arg) = args.first() && args.len() == 1 {
+                    ParseNode::_mmap(ident, arg.clone())
                 } else {
-                    cond = Some(self.parse_or_expr(lexer));
-                    next_tok = lexer.consume_token();
-                    if next_tok.kind != TokenType::End {
-                        panic!("{} Error: Expected `;` but got `{}`", next_tok.pos, next_tok.val_str());
+                    panic!("{} Error: Wrong argument count for mmap", ident.pos);
+                }
+            },
+            TokenType::KeywordMUnmap => {
+                if args.len() == 2 {
+                    ParseNode::_munmap(ident, args)
+                } else {
+                    panic!("{} Error: Wrong argument count for munmap", ident.pos);
+                }
+            },
+            TokenType::KeywordExit => {
+                if let Some(arg) = args.first() && args.len() == 1 { 
+                    ParseNode::_exit(ident, arg.clone())
+                } else {
+                    panic!("{} Error: Wrong argument count for exit", ident.pos);
+                }
+            },
+            TokenType::KeywordDebugDump => {
+                if let Some(arg) = args.first() && args.len() == 1 { 
+                    ParseNode::_dump(ident, arg.clone())
+                } else {
+                    panic!("{} Error: Wrong argument count for dump", ident.pos);
+                }
+            }
+            _ => ParseNode::_func_call(ident, args)
+        }
+
+        // if ident.kind == TokenType::KeywordMMap {
+        //     if let Some(arg) = args.first() && args.len() == 1 {
+        //         ParseNode::_mmap(ident, arg.clone())
+        //     } else {
+        //         panic!("{} Error: Invalid arguments for mmap", ident.pos);
+        //     }
+        // } else {
+        //     ParseNode::_func_call(ident, args)
+        // }
+    }
+
+    fn parse_var_decl(&mut self, lexer: &mut Lexer) -> (ParseNode, ParseNode) {
+        let datatype: DataType = DataType::from_token(&lexer.expect_tokens(vec![TokenType::TypeInt64, TokenType::TypeInt64Ptr]));
+        let ident: Token = lexer.expect_token(TokenType::Identifier);
+        let mut rhs: Option<ParseNode> = None;
+        let operator: Token = lexer.peek_token();
+        if operator.kind == TokenType::OpAssign {
+            lexer.consume_token();
+            rhs = Some(self.parse_expression(lexer, Precedence::Additive as usize));
+        }
+        let lhs: ParseNode = ParseNode::_var_decl(datatype, ident.clone());
+        if let Some(rhs) = rhs {
+            return (lhs.clone(), ParseNode::_assign(operator, ParseNode::_var(ident), rhs));
+        }
+
+        (lhs, ParseNode::_assign(operator, ParseNode::_var(ident), ParseNode::_zero_literal()))
+    }
+
+    // <Union>          : <Intersection> [ "||" <Intersection> ]
+    // <Intersection>   : <Equality>     [ "&&" <Equality> ]
+    // <Equality>       : <Relational>   [ ( "==" | "!=" ) <Relational> ]
+    // <Relational>     : <Additive>     [ ( "<" | ">" | "<=" | ">=" ) <Additive> ]
+    // <Additive>       : <Term>         [ ( "+" | "-" ) <Term> ]
+    // <Term>           : <Factor>       [ ( "*" | "/" ) <Factor> ]
+    fn parse_expression(&mut self, lexer: &mut Lexer, level: usize) -> ParseNode {
+        if level == Precedence::Factor as usize {
+            return self.parse_factor(lexer);
+        }
+        let mut lhs = self.parse_expression(lexer, level + 1);
+
+        while self.precedence[level].contains(&lexer.peek_token().kind) {
+            let operator: Token = lexer.consume_token();
+            lhs = ParseNode::_binary_op(operator, lhs, self.parse_expression(lexer, level + 1));
+        }
+
+        lhs
+    }
+
+    // <Factor> : <Literal-Int> | <Func-Call> | "(" <Union> ")" | <Unary> <Factor> | <Ident>
+    fn parse_factor(&mut self, lexer: &mut Lexer) -> ParseNode {
+        match lexer.peek_token().kind {
+            TokenType::Int => {
+                ParseNode::_literal_int(lexer.consume_token())
+            },
+            TokenType::Identifier | TokenType::KeywordMMap => {
+                if lexer.peek_next_token().kind == TokenType::OpenParen {
+                    self.parse_func_call(lexer)
+                } else {
+                    ParseNode::_var(lexer.consume_token())
+                }
+            },
+            TokenType::OpenParen => {
+                lexer.consume_token();
+                let expr: ParseNode = self.parse_expression(lexer, Precedence::Union as usize);
+                lexer.expect_token(TokenType::CloseParen);
+                expr
+            },
+            TokenType::OpMinus | TokenType::OpDereference => {
+                ParseNode::_unary_op(lexer.consume_token(), self.parse_factor(lexer))
+            },
+            _ => panic!("{} Error: Expected factor but got `{}`", lexer.peek_token().pos, lexer.peek_token().val_str())
+        }
+    }
+
+    fn parse_statement(&mut self, lexer: &mut Lexer) -> Vec<ParseNode> {
+        match lexer.peek_token().kind {
+            // "dump" <Additive> ";"
+            // TokenType::KeywordDebugDump => {
+            //     let tok: Token = lexer.consume_token();
+            //     lexer.expect_token(TokenType::OpenParen);
+            //     let expr: ParseNode = ParseNode::_dump(tok, self.parse_expression(lexer, Precedence::Additive as usize));
+            //     lexer.expect_token(TokenType::CloseParen);
+            //     lexer.expect_token(TokenType::End);
+            //     vec![expr]
+            // },
+            // "exit" "(" <Additive> ")" ";"
+            // TokenType::KeywordExit => {
+            //     let tok: Token = lexer.consume_token();
+            //     lexer.expect_token(TokenType::OpenParen);
+            //     let expr: ParseNode = ParseNode::_exit(tok, self.parse_expression(lexer, Precedence::Additive as usize));
+            //     lexer.expect_token(TokenType::CloseParen);
+            //     lexer.expect_token(TokenType::End);
+            //     vec![expr]
+            // },
+            // "return" <Additive> ";"
+            TokenType::KeywordReturn => {
+                let expr: ParseNode = ParseNode::_return(lexer.consume_token(), self.parse_expression(lexer, Precedence::Union as usize));
+                lexer.expect_token(TokenType::End);
+                vec![expr]
+            },
+            // "break" ";"
+            TokenType::KeywordBreak => {
+                let expr: ParseNode = ParseNode::_break(lexer.consume_token());
+                lexer.expect_token(TokenType::End);
+                vec![expr]
+            },
+            // "continue" ";"
+            TokenType::KeywordContinue => {
+                let expr: ParseNode = ParseNode::_continue(lexer.consume_token());
+                lexer.expect_token(TokenType::End);
+                vec![expr]
+            },
+            // "for" [ ( <Var-Decl> | <Assign> ) ]  ";" [ <Union> ] ";" ( <Assign> | Func-Call ) "{" { <Statement> } "}"
+            TokenType::KeywordFor => {
+                let ident: Token = lexer.consume_token();
+
+                let mut decl: Option<ParseNode> = None;
+                let mut init: Option<ParseNode> = None;
+                if matches!(lexer.peek_token().kind, TokenType::TypeInt64Ptr | TokenType::TypeInt64) {
+                    let (d, i) = self.parse_var_decl(lexer);
+                    decl = Some(d);
+                    init = Some(i);
+                } else if lexer.peek_token().kind != TokenType::End {
+                    // init = Some(self.parse_expression(lexer, Precedence::Union as usize));
+                    let ident: Token = lexer.expect_token(TokenType::Identifier);
+                    let assign: Token = lexer.expect_token(TokenType::OpAssign);
+                    let rhs: ParseNode = self.parse_expression(lexer, Precedence::Additive as usize);
+                    init = Some(ParseNode::_assign(assign, ParseNode::_var(ident), rhs));
+                }
+
+                lexer.expect_token(TokenType::End);
+
+                let mut cond: Option<ParseNode> = None;
+                if lexer.peek_token().kind != TokenType::End {
+                    cond = Some(self.parse_expression(lexer, Precedence::Union as usize));
+                }
+
+                lexer.expect_token(TokenType::End);
+
+                let mut post: Option<ParseNode> = None;
+                if lexer.peek_token().kind != TokenType::OpenScope {
+                    if lexer.peek_next_token().kind == TokenType::OpenParen {
+                        post = Some(self.parse_func_call(lexer));
+                    } else if lexer.peek_token().kind == TokenType::Identifier {
+                        let ident: Token = lexer.expect_token(TokenType::Identifier);
+                        let assign: Token = lexer.expect_token(TokenType::OpAssign);
+                        let rhs: ParseNode = self.parse_expression(lexer, Precedence::Additive as usize);
+                        post = Some(ParseNode::_assign(assign, ParseNode::_var(ident), rhs));
+                    } else if lexer.peek_token().kind == TokenType::OpDereference {
+                        let deref: Token = lexer.consume_token();
+                        let ident: Token = lexer.expect_token(TokenType::Identifier);
+                        let assign: Token = lexer.expect_token(TokenType::OpAssign);
+                        let rhs: ParseNode = self.parse_expression(lexer, Precedence::Additive as usize);
+                        post = Some(ParseNode::_assign(assign, ParseNode::_unary_op(deref, ParseNode::_var(ident)), rhs));
+                    } else {
+                        panic!("{} Error: Expected assign or function call but got `{}`", lexer.peek_token().pos, lexer.peek_token().val_str());
                     }
                 }
 
-                let mut post: Option<ParseNode> = None;
-                next_tok = lexer.consume_token();
-                match next_tok.kind {
-                    TokenType::OpenScope => {},
-                    TokenType::Identifier => {
-                        let ident_tok: Token = next_tok.clone();
-                        next_tok = lexer.consume_token();
-                        if next_tok.kind != TokenType::OpAssign {
-                            panic!("{} Error: Expected `=` but got `{}`", next_tok.pos, next_tok.val_str());
-                        }
-
-                        let expression: ParseNode = self.parse_add_expr(lexer);
-                        next_tok = lexer.consume_token();
-                        if next_tok.kind != TokenType::OpenScope {
-                            panic!("{} Error: Expected `{{` but got `{}`", next_tok.pos, next_tok.val_str());
-                        }
-
-                        post = Some(ParseNode::new_assign(ident_tok, expression));
-                    },
-                    _ => {
-                        panic!("{} Error: Unexpected initializer in for loop `{}`", next_tok.pos, next_tok.val_str());
-                    },
-                }
+                // For body between scopes
+                lexer.expect_token(TokenType::OpenScope);
 
                 let mut body: Vec<ParseNode> = Vec::new();
-                next_tok = lexer.peek_token();
-                while next_tok.kind != TokenType::CloseScope {
-                    body.push(self.parse_block_item(lexer));
-                    next_tok = lexer.peek_token();
+                while lexer.peek_token().kind != TokenType::CloseScope {
+                    body.extend(self.parse_statement(lexer));
                 }
-                lexer.consume_token();
 
-                ParseNode::new_for_loop(tok, init, cond, post, ParseNode::new_block(body))
+                lexer.expect_token(TokenType::CloseScope);
+
+                vec![ParseNode::_for(ident, decl, init, cond, post, body)]
             },
-            TokenType::KeywordIf => {
-                let guard: ParseNode = self.parse_or_expr(lexer);
+            // "while" <Union> "{" { <Statement> } "}"
+            TokenType::KeywordWhile => {
+                let ident: Token = lexer.consume_token();
+                let cond: ParseNode = self.parse_expression(lexer, Precedence::Union as usize);
 
-                let mut next_tok: Token = lexer.consume_token();
-                if next_tok.kind != TokenType::OpenScope {
-                    panic!("{} Error: Expected `{{` but got `{}`", next_tok.pos, next_tok.val_str());
+                // While body between scopes
+                lexer.expect_token(TokenType::OpenScope);
+
+                let mut body: Vec<ParseNode> = Vec::new();
+                while lexer.peek_token().kind != TokenType::CloseScope {
+                    body.extend(self.parse_statement(lexer));
                 }
+
+                lexer.expect_token(TokenType::CloseScope);
+
+                vec![ParseNode::_while(ident, cond, body)]
+            },
+            // "if" <Union> "{" { <Statement> } "}" [ "else" "{" { <Statement> } "}" ]
+            TokenType::KeywordIf => {
+                let ident: Token = lexer.consume_token();
+                let cond: ParseNode = self.parse_expression(lexer, Precedence::Union as usize);
+
+                // If body between scopes
+                lexer.expect_token(TokenType::OpenScope);
 
                 let mut if_body: Vec<ParseNode> = Vec::new();
-                next_tok = lexer.peek_token();
-                while next_tok.kind != TokenType::CloseScope {
-                    if_body.push(self.parse_block_item(lexer));
-                    next_tok = lexer.peek_token();
+                while lexer.peek_token().kind != TokenType::CloseScope {
+                    if_body.extend(self.parse_statement(lexer));
                 }
-                lexer.consume_token();
 
-                next_tok = lexer.peek_token();
-                if next_tok.kind != TokenType::KeywordElse {
-                    return ParseNode::new_conditional(tok, guard, ParseNode::new_block(if_body), None);
-                }
-                lexer.consume_token();
-
-                next_tok = lexer.consume_token();
-                if next_tok.kind != TokenType::OpenScope {
-                    panic!("{} Error: Expected `{{` but got `{}`", next_tok.pos, next_tok.val_str());
-                }
+                lexer.expect_token(TokenType::CloseScope);
 
                 let mut else_body: Vec<ParseNode> = Vec::new();
-                next_tok = lexer.peek_token();
-                while next_tok.kind != TokenType::CloseScope {
-                    else_body.push(self.parse_block_item(lexer));
-                    next_tok = lexer.peek_token();
-                }
-                lexer.consume_token();
+                if lexer.peek_token().kind == TokenType::KeywordElse {
+                    lexer.consume_token();
+                    // Else body between scopes
+                    lexer.expect_token(TokenType::OpenScope);
 
-                ParseNode::new_conditional(tok, guard, ParseNode::new_block(if_body), Some(ParseNode::new_block(else_body)))
-            },
-            TokenType::KeywordReturn => {
-                let expression: ParseNode = self.parse_add_expr(lexer);
-                let next_tok: Token = lexer.consume_token();
-                if next_tok.kind != TokenType::End {
-                    panic!("{} Error: Expected `;` but got `{}`", next_tok.pos, next_tok.val_str());
-                }
-                ParseNode::new_return(tok, expression)
-            },
-            TokenType::KeywordExit => {
-                let expression: ParseNode = self.parse_add_expr(lexer);
-                let next_tok: Token = lexer.consume_token();
-                if next_tok.kind != TokenType::End {
-                    panic!("{} Error: Expected `;` but got `{}`", next_tok.pos, next_tok.val_str());
-                }
-                ParseNode::new_exit(tok, expression)
-            },
-            TokenType::KeywordDebugDump => {
-                let expression: ParseNode = self.parse_add_expr(lexer);
-                let next_tok: Token = lexer.consume_token();
-                if next_tok.kind != TokenType::End {
-                    panic!("{} Error: Expected `;` but got `{}`", next_tok.pos, next_tok.val_str());
-                }
-                ParseNode::new_debug_dump(tok, expression)
-            },
-            TokenType::Identifier => {
-                let mut next_tok: Token = lexer.consume_token();
-                match next_tok.kind {
-                    // Function Call
-                    TokenType::OpenParen => {
-                        let mut params: Vec<ParseNode> = Vec::new();
-                        next_tok = lexer.peek_token();
-                        while next_tok.kind != TokenType::CloseParen {
-                            if next_tok.kind == TokenType::Separator {
-                                if params.is_empty() {
-                                    panic!("{} Error: Expected `,` but got `{}`", next_tok.pos, next_tok.val_str());
-                                } else {
-                                    lexer.consume_token();
-                                }
-                            }
+                    while lexer.peek_token().kind != TokenType::CloseScope {
+                        else_body.extend(self.parse_statement(lexer));
+                    }
 
-                            params.push(self.parse_or_expr(lexer));
-                            next_tok = lexer.peek_token();
-                        }
-                        lexer.consume_token();
-                        next_tok = lexer.consume_token();
-                        if next_tok.kind != TokenType::End {
-                            panic!("{} Error: Expected `;` but got `{}`", next_tok.pos, next_tok.val_str());
-                        }
+                    lexer.expect_token(TokenType::CloseScope);
+                }
 
-                        params.reverse();
-                        ParseNode::new_func_call(tok, params)
-                    },
-                    // Variable Assignment
-                    TokenType::OpAssign => {
-                        let expression: ParseNode = self.parse_add_expr(lexer);
-                        next_tok = lexer.consume_token();
-                        if next_tok.kind != TokenType::End {
-                            panic!("{} Error: Expected `;` but got `{}`", next_tok.pos, next_tok.val_str());
-                        }
-                        ParseNode::new_assign(tok, expression)
-                    },
-                    _ => panic!("{} Error: Expected `(` or `=` but got `{}`", next_tok.pos, next_tok.val_str()),
+                vec![ParseNode::_conditional(ident, cond, if_body, else_body)]
+            },
+            // <Func-Call> ";"
+            // <Assign> ";"
+            TokenType::KeywordMMap
+            | TokenType::KeywordMUnmap
+            | TokenType::KeywordExit 
+            | TokenType::KeywordDebugDump
+            | TokenType::Identifier => {
+                let expr: ParseNode;
+                if lexer.peek_next_token().kind == TokenType::OpenParen {
+                    expr = self.parse_func_call(lexer);
+                } else if lexer.peek_next_token().kind == TokenType::OpAssign {
+                    let ident: Token = lexer.consume_token();
+                    let operator: Token = lexer.consume_token();
+                    let rhs: ParseNode = self.parse_expression(lexer, Precedence::Additive as usize);
+                    expr = ParseNode::_assign(operator, ParseNode::_var(ident), rhs)
+                } else {
+                    panic!("{} Error: Expected assignment or function call but got `{}`", lexer.peek_token().pos, lexer.peek_token().val_str());
+                }
+                lexer.expect_token(TokenType::End);
+                vec![expr]
+            },
+            // <Var-Decl> ";"
+            TokenType::TypeInt64 | TokenType::TypeInt64Ptr => {
+                let (decl, init) = self.parse_var_decl(lexer);
+                lexer.expect_token(TokenType::End);
+                vec![decl, init]
+            },
+            // <Assign> ";"
+            TokenType::OpDereference => {
+                // <Assign> : [ "@" ] <Ident> "=" <Additive> | "@" "(" <Additive> ")" "=" <Additive>
+                let deref = lexer.consume_token();
+                if lexer.peek_token().kind == TokenType::Identifier {
+                    let ident: Token = lexer.expect_token(TokenType::Identifier);
+                    let operator: Token = lexer.consume_token();
+                    let rhs: ParseNode = self.parse_expression(lexer, Precedence::Additive as usize);
+                    let expr: ParseNode = ParseNode::_assign(operator, ParseNode::_unary_op(deref, ParseNode::_var(ident)), rhs);
+                    lexer.expect_token(TokenType::End);
+                    vec![expr]
+                } else {
+                    lexer.expect_token(TokenType::OpenParen);
+                    let lhs: ParseNode = self.parse_expression(lexer, Precedence::Additive as usize);
+                    lexer.expect_token(TokenType::CloseParen);
+
+                    let operator: Token = lexer.consume_token();
+                    let rhs: ParseNode = self.parse_expression(lexer, Precedence::Additive as usize);
+                    let expr: ParseNode = ParseNode::_assign(operator, ParseNode::_unary_op(deref, lhs), rhs);
+                    lexer.expect_token(TokenType::End);
+                    vec![expr]
                 }
             },
-            _ => panic!("{} Error: Expected statement but got `{}`", tok.pos, tok.val_str()),
+            _ => panic!("{} Error: Expected statement but got `{}`", lexer.peek_token().pos, lexer.peek_token().val_str())
         }
     }
 }

@@ -1,14 +1,14 @@
 i64 test_for_loop() {
     for i64 i = 0; i < 10; i = i + 1 {
-        dump i;
+        dump(i);
         for i64 j = 0; j < 10; j = j + 1 {
-            dump 100 + j;
+            dump(100 + j);
             if j == 5 {
                 break;
             }
         }
 
-        dump 200 + i;
+        dump(200 + i);
         if i == 5 {
             break;
         }
@@ -20,15 +20,15 @@ i64 test_for_loop() {
 i64 test_while_loop() {
     i64 i = 0;
     while i < 10 {
-        dump i;
+        dump(i);
         for i64 j = 0; j < 10; j = j + 1 {
-            dump 100 + j;
+            dump(100 + j);
             if j == 5 {
                 break;
             }
         }
 
-        dump 200 + i;
+        dump(200 + i);
         if i == 5 {
             break;
         }
@@ -42,4 +42,5 @@ i64 test_while_loop() {
 i64 main() {
     test_for_loop();
     test_while_loop();
+    exit(0);
 }

@@ -1,18 +1,18 @@
 i64 main() {
     i64 a = 10;
-    dump a;
+    dump(a);
 
     i64 b = a*a + 2;
-    dump b;
+    dump(b);
 
     i64 c = 2 + a + b;
-    dump c;
+    dump(c);
 
-    dump a + b;
+    dump(a + b);
 
-    dump b / a;
+    dump(b / a);
 
-    dump c - 100;
+    dump(c - 100);
 
-    exit 0;
+    exit(0);
 }

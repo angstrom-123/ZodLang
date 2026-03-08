@@ -1,0 +1,26 @@
+i64 main() {
+    // for i64 a = 0; a < 10; a = a + 1 {
+    //     dump(a);
+    //     
+    //     for i64 b = 100; b < 103; b = b + 1 {
+    //         dump(b);
+    //     }
+    // }
+
+    i64 a = 10;
+    if 1 < 2 {
+        i64 b = 1000;
+        dump(b);
+
+        if 2 < 3 {
+            i64 c = 1000000;
+            dump(c);
+        }
+
+        dump(b);
+    }
+
+    dump(a);
+
+    exit(0);
+}

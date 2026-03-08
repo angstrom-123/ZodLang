@@ -4,13 +4,13 @@ i64 main() {
     if a == 10 {
         a = 30;
         i64 b = 10;
-        dump b;
+        dump(b);
     }
 
     i64 b = 20;
 
-    dump b;
-    dump a;
+    dump(b);
+    dump(a);
 
-    exit 0;
+    exit(0);
 }

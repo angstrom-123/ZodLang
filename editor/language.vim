@@ -14,14 +14,14 @@ if exists("b:current_syntax")
     finish
 endif
 
-set iskeyword=a-z,A-Z,_,48-57
+set iskeyword=a-z,A-Z,_,48-57,94
 syntax keyword langTodos TODO BUG NOTE
 
 " Types
-syntax keyword langTypes i64
+syntax keyword langTypes i64 i64^
 
 " Language Keywords 
-syntax keyword langKeywords if if* else exit dump continue break for return 
+syntax keyword langKeywords if if* else exit mmap munmap dump continue break for return 
 
 " Comments 
 syntax region langCommentLine start="//" end="$" contains=langTodos
