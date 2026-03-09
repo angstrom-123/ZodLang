@@ -25,7 +25,8 @@ fn run_test(test_name: &str) {
     let src: Vec<u8> = fs::read(src_path.clone()).expect("Error: Test failed to read source file");
     let exp: Vec<u8> = fs::read(exp_path.clone()).expect("Error: Test failed to read expected file");
 
-    compile(src, res_path.clone(), vec![]);
+    let compiler: Compiler = Compiler::new();
+    compiler.compile(src, res_path.clone());
     let run = Command::new(res_path.clone()).output().expect("Error: Failed to run executable");
     let stdout_str: String = String::from_utf8(run.stdout.clone()).expect("Error: Failed to convert stdout to string");
     let exp_str: String = String::from_utf8(exp.clone()).expect("Error: Failed to convert expected to string");

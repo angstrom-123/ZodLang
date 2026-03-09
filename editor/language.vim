@@ -21,7 +21,7 @@ syntax keyword langTodos TODO BUG NOTE
 syntax keyword langTypes i64 i64^
 
 " Language Keywords 
-syntax keyword langKeywords if if* else exit mmap munmap dump continue break for return 
+syntax keyword langKeywords if if* else exit mmap munmap dump continue break for return while
 
 " Comments 
 syntax region langCommentLine start="//" end="$" contains=langTodos

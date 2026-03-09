@@ -2,12 +2,15 @@
 My attempt at writing a compiled programming language in Rust for x86_64 Linux.
 This language compiles to assembly, assembles with nasm, and links with ld 
 into a native executable. My goal is to avoid as many dependencies as I can, so 
-I am avoiding extra crates, and I will not be linking with standard libraries such 
-as glibc.
+I am avoiding extra crates and I will not be linking with standard libraries such 
+as glibc. For ease of use, I am using Cargo for building and running tests, but 
+this is not required.
 
 ## Usage
 ### Compile the Program
 Debug Build:
+> [!NOTE]
+> Cargo is not required since no additional crates are used by this language.
 ```
 cargo build
 ```
@@ -19,16 +22,19 @@ cargo test
 
 ### Run the Compiler
 ```
-./<compiler_path> <file_path> <flags>
+./<compiler_path> <flags>
 ```
 
-| Flag         | Shorthand | Argument | Meaning               |
-| -----------  | --------- | -------- | --------------------- |
-| --parse-tree | -pt       |          | Print parse tree      |
-| --assembly   | -a        |          | Keep intermediate asm |
-| --tokens     | -t        |          | Print lexed tokens    |
-| --run        | -r        |          | Run after compiling   |
-| --output     | -o        | Out Path | Specify output path   |
+| Flag         | Shorthand | Argument | Meaning                          |
+| -----------  | --------- | -------- | -------------------------------- |
+| --assembly   | -a        |          | Keep intermediate asm            |
+| --inter-repr | -ir       |          | Emit intermediate representation |
+| --output     | -o        | Out Path | Specify output path              |
+| --parsetree  | -p        |          | Print parse tree                 |
+| --run        | -r        |          | Run after compiling              |
+| --tokens     | -t        |          | Print lexed tokens               |
+| --unsafe     | -u        |          | Skip static type analysis        |
+| --verbose    | -v        |          | Enable info logging              |
 
 ## Examples
 See the examples folder in the project root for some programs showcasing the 

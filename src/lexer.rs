@@ -22,10 +22,6 @@ pub enum TokenType {
     OpLogicalAnd,
     OpDereference,
     KeywordReturn,
-    KeywordMMap,
-    KeywordMUnmap,
-    KeywordExit,
-    KeywordDebugDump,
     KeywordIf,
     KeywordElse,
     KeywordFor,
@@ -42,6 +38,7 @@ pub enum TokenType {
     CloseScope,
     Identifier,
     Int,
+    Pointer,
 }
 impl TokenType {
     pub fn val_str(&self) -> &'static str {
@@ -62,10 +59,6 @@ impl TokenType {
             TokenType::OpLogicalAnd     => "&&",
             TokenType::OpDereference    => "@",
             TokenType::KeywordReturn    => "return",
-            TokenType::KeywordMMap      => "mmap",
-            TokenType::KeywordMUnmap    => "munmap",
-            TokenType::KeywordExit      => "exit",
-            TokenType::KeywordDebugDump => "dump",
             TokenType::KeywordIf        => "if",
             TokenType::KeywordElse      => "else",
             TokenType::KeywordFor       => "for",
@@ -82,6 +75,7 @@ impl TokenType {
             TokenType::CloseScope       => "}",
             TokenType::Identifier       => "identifier",
             TokenType::Int              => "literal int",
+            TokenType::Pointer          => "literal pointer",
         }
     }
 }
@@ -410,7 +404,6 @@ impl Lexer {
                     "&&"       => tok.kind = TokenType::OpLogicalAnd,
                     "||"       => tok.kind = TokenType::OpLogicalOr,
                     // Keywords
-                    "dump"     => tok.kind = TokenType::KeywordDebugDump,
                     "if"       => tok.kind = TokenType::KeywordIf,
                     "else"     => tok.kind = TokenType::KeywordElse,
                     "for"      => tok.kind = TokenType::KeywordFor,
@@ -418,19 +411,20 @@ impl Lexer {
                     "continue" => tok.kind = TokenType::KeywordContinue,
                     "break"    => tok.kind = TokenType::KeywordBreak,
                     "return"   => tok.kind = TokenType::KeywordReturn,
-                    // Syscalls (pending proper syscall keyword - I need more data types)
-                    "exit"     => tok.kind = TokenType::KeywordExit,
-                    "mmap"     => tok.kind = TokenType::KeywordMMap,
-                    "munmap"   => tok.kind = TokenType::KeywordMUnmap,
                     // Types
                     "i64"      => tok.kind = TokenType::TypeInt64,
                     "i64^"     => tok.kind = TokenType::TypeInt64Ptr,
                     _ => { // Then match variable contents of words
-                        if tok.val.iter().all(|c| c.is_ascii_digit()) {
-                            tok.kind = TokenType::Int;
+                        if tok.val.iter().rev().skip(1).rev().all(|c| c.is_ascii_digit()) {
+                            let last: &u8 = tok.val.last().unwrap();
+                            match last {
+                                b'0'..=b'9' => tok.kind = TokenType::Int,
+                                b'p' => tok.kind = TokenType::Pointer,
+                                _ => panic!("{} Error: Invalid token `{}` in numeric literal", tok.pos, last)
+                            }
                         } else if first.is_ascii_alphabetic() {
                             for c in &tok.val {
-                                if matches!(c, b'"' | b'$' | b'%' | b'^' | b'&' | b'~' | b'#' | b'\\' | b',' | b'.' | b'`') {
+                                if matches!(c, b'"' | b'$' | b'%' | b'^' | b'&' | b'~' | b'#' | b'\\' | b',' | b'.' | b'`'| b'!') {
                                     panic!("{} Error: Invalid token `{}` in identifier", tok.pos, String::from_utf8(vec![*c]).expect("Error: Failed to convert char to str"));
                                 }
                             }

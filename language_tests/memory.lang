@@ -9,20 +9,20 @@ i64 test_one() {
 
     @mem = 10;
 
-    mem = mem + 8;
+    mem = mem + 8p;
     @mem = 20;
 
-    mem = mem + 8;
+    mem = mem + 8p;
     @mem = 30;
 
-    mem = mem + 8;
+    mem = mem + 8p;
     @mem = 40;
 
-    mem = mem - 24;
+    mem = mem - 24p;
     dump(@mem);
-    dump(@(mem + 8));
-    dump(@(mem + 16));
-    dump(@(mem + 24));
+    dump(@(mem + 8p));
+    dump(@(mem + 16p));
+    dump(@(mem + 24p));
 
     munmap(mem, 4096);
 }
@@ -33,11 +33,11 @@ i64 test_two() {
     dump(1);
     @(mem) = 100;
     dump(2);
-    @(mem + 8) = 200;
+    @(mem + 8p) = 200;
     dump(3);
     dump(@mem);
     dump(4);
-    dump(@(mem + 8));
+    dump(@(mem + 8p));
     dump(5);
 
     munmap(mem, 4096);

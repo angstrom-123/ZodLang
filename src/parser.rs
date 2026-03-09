@@ -1,4 +1,5 @@
 use crate::lexer::Lexer;
+use crate::lexer::Pos;
 use crate::lexer::Token;
 use crate::lexer::TokenType;
 
@@ -8,9 +9,7 @@ use crate::lexer::TokenType;
 // <Func-Call>      : <Ident> "(" [ <Union> { "," <Union> } ] ")" | "mmap" "(" <Additive> ")"
 // <Type>           : "i64" | "i64^"
 // <Assign>         : [ "@" ] <Ident> "=" <Additive> | "@" "(" <Additive> ")" "=" <Additive>
-// <Statement>      : "dump" <Additive> ";"
-//                  | "exit" "(" <Additive> ")" ";"
-//                  | "return" <Additive> ";"
+// <Statement>      : "return" <Additive> ";"
 //                  | "break" ";"
 //                  | "continue" ";"
 //                  | "for" [ ( <Var-Decl> | <Assign> ) ] ";" [ <Union> ] ";" ( <Assign> | Func-Call ) "{" { <Statement> } "}"
@@ -47,6 +46,13 @@ impl DataType {
             _ => panic!("{} Error: Failed to convert token `{}` to datatype", tok.pos, tok.val_str())
         }
     }
+
+    pub fn base_type(typ: &DataType) -> Option<DataType> {
+        match typ {
+            DataType::I64Ptr => Some(DataType::I64),
+            _ => None
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -57,6 +63,7 @@ pub enum NodeType {
     Group,
     Var,
     LiteralInt,
+    LiteralPointer,
     FuncCall,
     FuncDecl,
     VarDecl,
@@ -64,20 +71,11 @@ pub enum NodeType {
     Conditional,
     ForLoop,
     WhileLoop,
-    DebugDump,
-    Exit,
-    MMap,
-    MUnmap,
     Return,
     Continue,
     Break,
     BinaryOp,
     UnaryOp,
-
-
-
-
-    DerefAssign,
 }
 
 #[derive(Clone)]
@@ -88,6 +86,10 @@ pub struct ParseNode {
     pub children: Vec<ParseNode>,
 }
 impl ParseNode {
+    pub fn is_null(&self) -> bool {
+        self.kind == NodeType::Null
+    }
+
     pub fn dump(&self, _depth: usize) {
         eprintln!("{}: {:padding$}\x1b[94m* {:?}\x1b[0m (\x1b[92m{:?}::{:?}\x1b[0m: `{}`)", self.tok.pos, "", self.kind, self.tok.kind, self.datatype, self.tok.val_str(), padding = _depth);
 
@@ -156,6 +158,15 @@ impl ParseNode {
         }
     }
 
+    fn _literal_pointer(tok: Token) -> Self {
+        ParseNode {
+            kind: NodeType::LiteralPointer,
+            datatype: DataType::I64Ptr,
+            tok,
+            children: vec![]
+        }
+    }
+
     fn _continue(tok: Token) -> Self {
         ParseNode {
             kind: NodeType::Continue,
@@ -174,46 +185,10 @@ impl ParseNode {
         }
     }
 
-    fn _dump(tok: Token, rhs: ParseNode) -> Self {
-        ParseNode {
-            kind: NodeType::DebugDump,
-            datatype: DataType::None,
-            tok,
-            children: vec![rhs]
-        }
-    }
-
     fn _return(tok: Token, rhs: ParseNode) -> Self {
         ParseNode {
             kind: NodeType::Return,
             datatype: DataType::Unknown,
-            tok,
-            children: vec![rhs]
-        }
-    }
-
-    fn _exit(tok: Token, rhs: ParseNode) -> Self {
-        ParseNode {
-            kind: NodeType::Exit,
-            datatype: DataType::None,
-            tok,
-            children: vec![rhs]
-        }
-    }
-
-    fn _munmap(tok: Token, rhs: Vec<ParseNode>) -> Self {
-        ParseNode {
-            kind: NodeType::MUnmap,
-            datatype: DataType::I64,
-            tok,
-            children: rhs
-        }
-    }
-
-    fn _mmap(tok: Token, rhs: ParseNode) -> Self {
-        ParseNode {
-            kind: NodeType::MMap,
-            datatype: DataType::I64Ptr,
             tok,
             children: vec![rhs]
         }
@@ -337,7 +312,6 @@ pub struct ParseTree<'a> {
     pub root: ParseNode,
     pub precedence: &'a[&'a[TokenType]; Precedence::_Count as usize],
 }
-
 impl<'a> Default for ParseTree<'a> {
     fn default() -> Self {
         Self::new()
@@ -358,8 +332,45 @@ impl <'a> ParseTree<'a> {
         ParseTree { root, precedence }
     }
 
+    // NOTE: Currently hard coded intrinsice (dump, exit, mmap, munmap) are entered here as if 
+    // they were regular functions, this lets the type checker pass.
     pub fn construct(&mut self, lexer: &mut Lexer) {
         let mut children: Vec<ParseNode> = Vec::new();
+        let exit = ParseNode::_func_decl(DataType::None, 
+                                         Token { 
+                                             kind: TokenType::Identifier, 
+                                             val: Vec::from(b"exit"),
+                                             pos: Pos { row: usize::MAX, col: usize::MAX } 
+                                         },
+                                         vec![ParseNode::_var_decl(DataType::I64, Token::null())], 
+                                         vec![]);
+        let dump = ParseNode::_func_decl(DataType::None, 
+                                         Token { 
+                                             kind: TokenType::Identifier, 
+                                             val: Vec::from(b"dump"),
+                                             pos: Pos { row: usize::MAX, col: usize::MAX } 
+                                         },
+                                         vec![ParseNode::_var_decl(DataType::I64, Token::null())], 
+                                         vec![]);
+        let mmap = ParseNode::_func_decl(DataType::I64Ptr, 
+                                         Token { 
+                                             kind: TokenType::Identifier, 
+                                             val: Vec::from(b"mmap"),
+                                             pos: Pos { row: usize::MAX, col: usize::MAX } 
+                                         },
+                                         vec![ParseNode::_var_decl(DataType::I64, Token::null())], 
+                                         vec![]);
+        let munmap = ParseNode::_func_decl(DataType::I64, 
+                                           Token { 
+                                               kind: TokenType::Identifier, 
+                                               val: Vec::from(b"munmap"),
+                                               pos: Pos { row: usize::MAX, col: usize::MAX } 
+                                           },
+                                           vec![ParseNode::_var_decl(DataType::I64Ptr, Token::null()),
+                                                ParseNode::_var_decl(DataType::I64, Token::null())], 
+                                           vec![]);
+        children.append(&mut vec![dump, exit, mmap, munmap]);
+
         while lexer.has_token() {
             children.push(self.parse_func_decl(lexer));
         }
@@ -409,8 +420,7 @@ impl <'a> ParseTree<'a> {
 
     // <Func-Call> : <Ident> "(" [ <Union> { "," <Union> } ] ")" | "mmap" "(" <Additive> ")"
     fn parse_func_call(&mut self, lexer: &mut Lexer) -> ParseNode {
-        let ident: Token = lexer.expect_tokens(vec![TokenType::Identifier, TokenType::KeywordMMap, TokenType::KeywordDebugDump, 
-                                                    TokenType::KeywordExit, TokenType::KeywordMUnmap]);
+        let ident: Token = lexer.expect_token(TokenType::Identifier);
 
         // Function arguments between parens
         lexer.expect_token(TokenType::OpenParen);
@@ -426,48 +436,7 @@ impl <'a> ParseTree<'a> {
         lexer.expect_token(TokenType::CloseParen);
 
         args.reverse();
-
-        match ident.kind {
-            TokenType::KeywordMMap => {
-                if let Some(arg) = args.first() && args.len() == 1 {
-                    ParseNode::_mmap(ident, arg.clone())
-                } else {
-                    panic!("{} Error: Wrong argument count for mmap", ident.pos);
-                }
-            },
-            TokenType::KeywordMUnmap => {
-                if args.len() == 2 {
-                    ParseNode::_munmap(ident, args)
-                } else {
-                    panic!("{} Error: Wrong argument count for munmap", ident.pos);
-                }
-            },
-            TokenType::KeywordExit => {
-                if let Some(arg) = args.first() && args.len() == 1 { 
-                    ParseNode::_exit(ident, arg.clone())
-                } else {
-                    panic!("{} Error: Wrong argument count for exit", ident.pos);
-                }
-            },
-            TokenType::KeywordDebugDump => {
-                if let Some(arg) = args.first() && args.len() == 1 { 
-                    ParseNode::_dump(ident, arg.clone())
-                } else {
-                    panic!("{} Error: Wrong argument count for dump", ident.pos);
-                }
-            }
-            _ => ParseNode::_func_call(ident, args)
-        }
-
-        // if ident.kind == TokenType::KeywordMMap {
-        //     if let Some(arg) = args.first() && args.len() == 1 {
-        //         ParseNode::_mmap(ident, arg.clone())
-        //     } else {
-        //         panic!("{} Error: Invalid arguments for mmap", ident.pos);
-        //     }
-        // } else {
-        //     ParseNode::_func_call(ident, args)
-        // }
+        ParseNode::_func_call(ident, args)
     }
 
     fn parse_var_decl(&mut self, lexer: &mut Lexer) -> (ParseNode, ParseNode) {
@@ -510,10 +479,9 @@ impl <'a> ParseTree<'a> {
     // <Factor> : <Literal-Int> | <Func-Call> | "(" <Union> ")" | <Unary> <Factor> | <Ident>
     fn parse_factor(&mut self, lexer: &mut Lexer) -> ParseNode {
         match lexer.peek_token().kind {
-            TokenType::Int => {
-                ParseNode::_literal_int(lexer.consume_token())
-            },
-            TokenType::Identifier | TokenType::KeywordMMap => {
+            TokenType::Int => ParseNode::_literal_int(lexer.consume_token()),
+            TokenType::Pointer => ParseNode::_literal_pointer(lexer.consume_token()),
+            TokenType::Identifier => {
                 if lexer.peek_next_token().kind == TokenType::OpenParen {
                     self.parse_func_call(lexer)
                 } else {
@@ -535,24 +503,6 @@ impl <'a> ParseTree<'a> {
 
     fn parse_statement(&mut self, lexer: &mut Lexer) -> Vec<ParseNode> {
         match lexer.peek_token().kind {
-            // "dump" <Additive> ";"
-            // TokenType::KeywordDebugDump => {
-            //     let tok: Token = lexer.consume_token();
-            //     lexer.expect_token(TokenType::OpenParen);
-            //     let expr: ParseNode = ParseNode::_dump(tok, self.parse_expression(lexer, Precedence::Additive as usize));
-            //     lexer.expect_token(TokenType::CloseParen);
-            //     lexer.expect_token(TokenType::End);
-            //     vec![expr]
-            // },
-            // "exit" "(" <Additive> ")" ";"
-            // TokenType::KeywordExit => {
-            //     let tok: Token = lexer.consume_token();
-            //     lexer.expect_token(TokenType::OpenParen);
-            //     let expr: ParseNode = ParseNode::_exit(tok, self.parse_expression(lexer, Precedence::Additive as usize));
-            //     lexer.expect_token(TokenType::CloseParen);
-            //     lexer.expect_token(TokenType::End);
-            //     vec![expr]
-            // },
             // "return" <Additive> ";"
             TokenType::KeywordReturn => {
                 let expr: ParseNode = ParseNode::_return(lexer.consume_token(), self.parse_expression(lexer, Precedence::Union as usize));
@@ -679,11 +629,7 @@ impl <'a> ParseTree<'a> {
             },
             // <Func-Call> ";"
             // <Assign> ";"
-            TokenType::KeywordMMap
-            | TokenType::KeywordMUnmap
-            | TokenType::KeywordExit 
-            | TokenType::KeywordDebugDump
-            | TokenType::Identifier => {
+            TokenType::Identifier => {
                 let expr: ParseNode;
                 if lexer.peek_next_token().kind == TokenType::OpenParen {
                     expr = self.parse_func_call(lexer);

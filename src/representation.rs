@@ -37,6 +37,7 @@ pub enum InstructionType {
     CopyRegisterToVar,             // Copy value from a register to variable 
     CopyLiteralIntToRegister,      // Sets a register to a value
     CopyVarValToRegister,          // Copies the value of a variable to a register
+    CopyRegisterAToAdrAtRegisterB, // Copies a variable to the adress in the register
     MakeLabel,                     // Make a new label
     ReturnToCaller,                // Return to caller of function
     JumpIfZero,                    // Jumps to a label if the operand is 0
@@ -52,7 +53,6 @@ pub enum InstructionType {
     CallFunction,                  // Calls a function by its label
     ZeroRegister,                  // Sets a register to 0
     NegateRegister,                // Negates the value in a register
-    CopyRegisterAToAdrAtRegisterB, // Copies a variable to the adress in the register
     DereferenceRegister,           // Dereferences the registers adress into itself
     SubLiteralIntFromRegister,     // Subtracts an immediate value from a register
 }
@@ -607,7 +607,8 @@ impl IR {
         self.record_label(&mut Label::new("func_munmap"));
         self.instrs.push(Instruction::_define_intrinsic_munmap());
 
-        for func in &ast.root.children {
+        // NOTE: Skipping the first 4 declarations, because those are the hardcoded intrinsice
+        for func in ast.root.children.iter().skip(4) {
             if func.kind != NodeType::FuncDecl {
                 panic!("{} Error: {:?} `{}` is not allowed at the top level", func.tok.pos, func.kind, func.tok.val_str());
             }
@@ -691,7 +692,6 @@ impl IR {
     //      Return value in:
     //          RAX 
     //          RAX + RDX (128 bit)
-
     fn generate_func_call(&mut self, call: &ParseNode, _ctx: &mut Context) {
         if call.children.len() > 6 {
             panic!("{} Error: Passing to many args to function `{}`. Currently there is support for up to 6 args", call.tok.pos, call.tok.val_str());
@@ -721,11 +721,7 @@ impl IR {
             | NodeType::Continue
             | NodeType::Break
             | NodeType::Return
-            | NodeType::FuncCall
-            | NodeType::MMap
-            | NodeType::MUnmap
-            | NodeType::Exit
-            | NodeType::DebugDump => {
+            | NodeType::FuncCall => {
                 for node in &stmt.post_order() {
                     self.generate_from_node(node, ctx);
                 }
@@ -803,7 +799,7 @@ impl IR {
 
                 // Body
                 let mut while_ctx: Context = Context::under(&stmt.tok, ctx);
-                if let Some(body) = stmt.children.get(1) && body.kind != NodeType::Null {
+                if let Some(body) = stmt.children.get(1) && !body.is_null() {
                     for node in &body.children {
                         self.generate_from_statement(node, &mut while_ctx);
                     }
@@ -843,7 +839,7 @@ impl IR {
 
                 // Decl 
                 let mut decl_tok: Option<&Token> = None;
-                if let Some(decl) = stmt.children.first() && decl.kind != NodeType::Null {
+                if let Some(decl) = stmt.children.first() && !decl.is_null() {
                     self.instrs.push(Instruction::_comment("Decl"));
                     decl_tok = Some(&decl.tok);
                     for node in &decl.post_order() {
@@ -852,7 +848,7 @@ impl IR {
                 }
 
                 // Init 
-                if let Some(init) = stmt.children.get(1) && init.kind != NodeType::Null {
+                if let Some(init) = stmt.children.get(1) && !init.is_null() {
                     self.instrs.push(Instruction::_comment("Init"));
                     self.generate_from_statement(init, ctx);
                 }
@@ -862,7 +858,7 @@ impl IR {
                 // Condition 
                 self.record_label(&mut loop_label);
                 self.instrs.push(Instruction::_label(&loop_label));
-                if let Some(cond) = stmt.children.get(2) && cond.kind != NodeType::Null {
+                if let Some(cond) = stmt.children.get(2) && !cond.is_null() {
                     self.instrs.push(Instruction::_comment("Condition"));
                     for node in &cond.post_order() {
                         self.generate_from_node(node, ctx);
@@ -872,7 +868,7 @@ impl IR {
                 self.instrs.push(Instruction::_jump_if_zero(RegisterName::RAX, &end_label));
 
                 // Body
-                if let Some(body) = stmt.children.get(4) && body.kind != NodeType::Null {
+                if let Some(body) = stmt.children.get(4) && !body.is_null() {
                     self.instrs.push(Instruction::_comment("Body"));
                     for node in &body.children {
                         self.generate_from_statement(node, &mut for_ctx);
@@ -889,7 +885,7 @@ impl IR {
                     self.instrs.push(Instruction::_deallocate_stack_bytes(new_locals as i64 * 8));
                 }
 
-                if let Some(post) = stmt.children.get(3) && post.kind != NodeType::Null {
+                if let Some(post) = stmt.children.get(3) && !post.is_null() {
                     self.generate_from_statement(post, &mut for_ctx);
                 }
                 self.instrs.push(Instruction::_jump_to_label(&loop_label));
@@ -1155,6 +1151,13 @@ impl IR {
                     _ => unreachable!(),
                 }
             },
+            NodeType::LiteralPointer => {
+                self.instrs.push(Instruction::_comment("Literal Int"));
+                let mut val_str: String = node.tok.val_str();
+                val_str.pop();
+                let lit: i64 = val_str.parse::<i64>().unwrap();
+                self.instrs.push(Instruction::_push_stack_literal_int(lit));
+            },
             NodeType::LiteralInt => {
                 self.instrs.push(Instruction::_comment("Literal Int"));
                 let lit: i64 = node.tok.val_str().parse::<i64>().unwrap();
@@ -1185,13 +1188,7 @@ impl IR {
 
                 self.instrs.push(Instruction::_sub_literal_int_from_register(8, RegisterName::RSP));
             },
-            NodeType::FuncCall
-            | NodeType::MMap
-            | NodeType::MUnmap
-            | NodeType::Exit
-            | NodeType::DebugDump => {
-                self.generate_func_call(node, ctx);
-            },
+            NodeType::FuncCall => self.generate_func_call(node, ctx),
             NodeType::Continue => {
                 if ctx.ident.kind == TokenType::None {
                     panic!("{} Error: Unexpected continue in invalid scope `{}`", ctx.ident.pos, ctx.ident.val_str());
