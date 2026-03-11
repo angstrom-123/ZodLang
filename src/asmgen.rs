@@ -2,7 +2,7 @@ pub mod nasm_x86_64 {
     use std::fs;
     use std::io::Write;
 
-    use crate::representation::{IR, InstructionType, Operand};
+    use crate::representation::{IR, InstructionType};
 
     pub fn generate(out_path: &String, ir: &IR) -> std::io::Result<()> {
         let mut f = fs::File::create(out_path)?;
@@ -75,211 +75,124 @@ pub mod nasm_x86_64 {
                     writeln!(f, "    syscall")?;
                     writeln!(f, "    ret")?;
                 },
+                InstructionType::StartDataSegment => {
+                    writeln!(f, "segment .data")?;
+                },
+                InstructionType::DeclareString => {
+                    writeln!(f, "str_{}: db {}", instr.opera, instr.operb)?;
+                },
+                InstructionType::PushStackLiteralString => {
+                    writeln!(f, "    push str_{}", instr.opera)?;
+                },
                 InstructionType::CopyVarValToRegister => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-                    let Operand::StackOffset { value } = &instr.operb else { unreachable!(); };
-
-                    let op = if *value < 0 { "" } else { "+" };
-
-                    writeln!(f, "    mov {}, [rbp {} {}]", name, op, value)?;
+                    writeln!(f, "    mov {}, [rbp {}]", instr.opera, instr.operb)?;
                 },
                 InstructionType::PushStackRegister => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-
-                    writeln!(f, "    push {}", name)?;
+                    writeln!(f, "    push {}", instr.opera)?;
                 },
                 InstructionType::PushStackLiteralInt => {
-                    let Operand::LiteralInt { value } = &instr.opera else { unreachable!(); };
-
-                    writeln!(f, "    push {}", value)?;
+                    writeln!(f, "    push {}", instr.opera)?;
                 },
                 InstructionType::PopStack => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-
-                    writeln!(f, "    pop {}", name)?;
+                    writeln!(f, "    pop {}", instr.opera)?;
                 },
                 InstructionType::AddRegisterBToA => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-                    let namea = name;
-                    let Operand::Register { name } = &instr.operb else { unreachable!(); };
-                    let nameb = name;
-
-                    writeln!(f, "    add {}, {}", namea, nameb)?;
+                    writeln!(f, "    add {}, {}", instr.opera, instr.operb)?;
                 },
                 InstructionType::MulRegisterAByB => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-                    let namea = name;
-                    let Operand::Register { name } = &instr.operb else { unreachable!(); };
-                    let nameb = name;
-
-                    writeln!(f, "    imul {}, {}", namea, nameb)?;
+                    writeln!(f, "    imul {}, {}", instr.opera, instr.operb)?;
                 },
-                InstructionType::DivRCXByRAXManglingRDX => {
+                InstructionType::DivAByBManglingD => {
                     writeln!(f, "    xor rdx, rdx")?; 
-                    writeln!(f, "    idiv rcx")?;
+                    writeln!(f, "    mov rax, {}", instr.opera)?;
+                    writeln!(f, "    idiv {}", instr.operb)?;
                 },
                 InstructionType::SubRegisterBFromA => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-                    let namea = name;
-                    let Operand::Register { name } = &instr.operb else { unreachable!(); };
-                    let nameb = name;
-
-                    writeln!(f, "    sub {}, {}", namea, nameb)?;
+                    writeln!(f, "    sub {}, {}", instr.opera, instr.operb)?;
                 },
                 InstructionType::CopyRegisterBToA => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-                    let namea = name;
-                    let Operand::Register { name } = &instr.operb else { unreachable!(); };
-                    let nameb = name;
-
-                    writeln!(f, "    mov {}, {}", namea, nameb)?;
+                    writeln!(f, "    mov {}, {}", instr.opera, instr.operb)?;
                 },
                 InstructionType::CopyRegisterToVar => {
-                    let Operand::StackOffset { value } = &instr.opera else { unreachable!(); };
-                    let Operand::Register { name } = &instr.operb else { unreachable!(); };
-
-                    // Negative values already have the `-`
-                    let op = if *value < 0 { "" } else { "+" };
-
-                    writeln!(f, "    mov [rbp {} {}], {}", op, value, name)?;
+                    writeln!(f, "    mov [rbp {}], {}", instr.opera, instr.operb)?;
                 },
                 InstructionType::MakeLabel => {
-                    let Operand::Name { name } = &instr.opera else { unreachable!(); };
-
-                    writeln!(f, "{}:", name)?;
+                    writeln!(f, "{}:", instr.opera)?;
                 },
                 InstructionType::ReturnToCaller => {
                     writeln!(f, "    ret")?;
                 },
                 InstructionType::JumpIfZero => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-                    let namea = name;
-                    let Operand::Name { name } = &instr.operb else { unreachable!(); };
-                    let nameb = name;
-
-                    writeln!(f, "    cmp {}, 0", namea)?;
-                    writeln!(f, "    je {}", nameb)?;
+                    writeln!(f, "    cmp {}, 0", instr.opera)?;
+                    writeln!(f, "    je {}", instr.operb)?;
                 },
                 InstructionType::RegisterBLessA => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-                    let namea = name;
-                    let Operand::Register { name } = &instr.operb else { unreachable!(); };
-                    let nameb = name;
-
-                    writeln!(f, "    cmp {}, {}", namea, nameb)?;
-                    writeln!(f, "    mov {}, 0", namea)?;
-                    writeln!(f, "    setl {}", namea.as_byte())?;
+                    writeln!(f, "    cmp {}, {}", instr.opera, instr.operb)?;
+                    writeln!(f, "    mov {}, 0", instr.opera)?;
+                    writeln!(f, "    setl {}", instr.opera.byte())?;
                 },
                 InstructionType::RegisterBLessEqA => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-                    let namea = name;
-                    let Operand::Register { name } = &instr.operb else { unreachable!(); };
-                    let nameb = name;
-
-                    writeln!(f, "    cmp {}, {}", namea, nameb)?;
-                    writeln!(f, "    mov {}, 0", namea)?;
-                    writeln!(f, "    setle {}", namea.as_byte())?;
+                    writeln!(f, "    cmp {}, {}", instr.opera, instr.operb)?;
+                    writeln!(f, "    mov {}, 0", instr.opera)?;
+                    writeln!(f, "    setle {}", instr.opera.byte())?;
                 },
                 InstructionType::RegisterBGreaterA => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-                    let namea = name;
-                    let Operand::Register { name } = &instr.operb else { unreachable!(); };
-                    let nameb = name;
-
-                    writeln!(f, "    cmp {}, {}", namea, nameb)?;
-                    writeln!(f, "    mov {}, 0", namea)?;
-                    writeln!(f, "    setg {}", namea.as_byte())?;
+                    writeln!(f, "    cmp {}, {}", instr.opera, instr.operb)?;
+                    writeln!(f, "    mov {}, 0", instr.opera)?;
+                    writeln!(f, "    setg {}", instr.opera.byte())?;
                 },
                 InstructionType::RegisterBGreaterEqA => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-                    let namea = name;
-                    let Operand::Register { name } = &instr.operb else { unreachable!(); };
-                    let nameb = name;
-
-                    writeln!(f, "    cmp {}, {}", namea, nameb)?;
-                    writeln!(f, "    mov {}, 0", namea)?;
-                    writeln!(f, "    setge {}", namea.as_byte())?;
+                    writeln!(f, "    cmp {}, {}", instr.opera, instr.operb)?;
+                    writeln!(f, "    mov {}, 0", instr.opera)?;
+                    writeln!(f, "    setge {}", instr.opera.byte())?;
                 },
                 InstructionType::SubLiteralIntFromRegister => {
-                    let Operand::LiteralInt { value } = &instr.opera else { unreachable!(); };
-                    let Operand::Register { name } = &instr.operb else { unreachable!(); };
-
-                    writeln!(f, "    sub {}, {}", name, value)?;
+                    writeln!(f, "    sub {}, {}", instr.operb, instr.opera)?;
                 },
                 InstructionType::RegisterBEqA => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-                    let namea = name;
-                    let Operand::Register { name } = &instr.operb else { unreachable!(); };
-                    let nameb = name;
-
-                    writeln!(f, "    cmp {}, {}", namea, nameb)?;
-                    writeln!(f, "    mov {}, 0", namea)?;
-                    writeln!(f, "    sete {}", namea.as_byte())?;
+                    writeln!(f, "    cmp {}, {}", instr.opera, instr.operb)?;
+                    writeln!(f, "    mov {}, 0", instr.opera)?;
+                    writeln!(f, "    sete {}", instr.opera.byte())?;
                 },
                 InstructionType::RegisterBNEqA => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-                    let namea = name;
-                    let Operand::Register { name } = &instr.operb else { unreachable!(); };
-                    let nameb = name;
-
-                    writeln!(f, "    cmp {}, {}", namea, nameb)?;
-                    writeln!(f, "    mov {}, 0", namea)?;
-                    writeln!(f, "    setne {}", namea.as_byte())?;
+                    writeln!(f, "    cmp {}, {}", instr.opera, instr.operb)?;
+                    writeln!(f, "    mov {}, 0", instr.opera)?;
+                    writeln!(f, "    setne {}", instr.opera.byte())?;
                 },
                 InstructionType::RegisterBNEqLiteralIntA => {
-                    let Operand::LiteralInt { value } = &instr.opera else { unreachable!(); };
-                    let Operand::Register { name } = &instr.operb else { unreachable!(); };
-
-                    writeln!(f, "    cmp {}, {}", name, value)?;
-                    writeln!(f, "    mov {}, 0", name)?;
-                    writeln!(f, "    setne {}", name.as_byte())?;
+                    writeln!(f, "    cmp {}, {}", instr.operb, instr.opera)?;
+                    writeln!(f, "    mov {}, 0", instr.operb)?;
+                    writeln!(f, "    setne {}", instr.operb.byte())?;
                 },
                 InstructionType::DeallocateStackBytes => {
-                    let Operand::LiteralInt { value } = &instr.opera else { unreachable!(); };
-
-                    writeln!(f, "    add rsp, {}", value)?;
+                    writeln!(f, "    add rsp, {}", instr.opera)?;
                 },
                 InstructionType::JumpToLabel => {
-                    let Operand::Name { name } = &instr.opera else { unreachable!(); };
-
-                    writeln!(f, "    jmp {}", name)?;
+                    writeln!(f, "    jmp {}", instr.opera)?;
+                },
+                InstructionType::Syscall => {
+                    writeln!(f, "    syscall")?;
                 },
                 InstructionType::CallFunction => {
-                    let Operand::Name { name } = &instr.opera else { unreachable!(); };
-
-                    writeln!(f, "    call {}", name)?;
+                    writeln!(f, "    call {}", instr.opera)?;
                 },
                 InstructionType::ZeroRegister => {
-                    let Operand::Register { name } = &instr.operb else { unreachable!(); };
-
-                    writeln!(f, "    mov {}, 0", name)?;
+                    writeln!(f, "    mov {}, 0", instr.opera)?;
                 },
                 InstructionType::CopyLiteralIntToRegister => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-                    let Operand::LiteralInt { value } = &instr.operb else { unreachable!(); };
-
-                    writeln!(f, "    mov {}, {}", name, value)?;
+                    writeln!(f, "    mov {}, {}", instr.opera, instr.operb)?;
                 },
                 InstructionType::NegateRegister => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-                    writeln!(f, "    neg {}", name)?;
+                    writeln!(f, "    neg {}", instr.opera)?;
                 },
                 InstructionType::DereferenceRegister => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-                    writeln!(f, "    mov {}, [{}]", name, name)?;
+                    writeln!(f, "    mov {}, [{}]", instr.opera, instr.opera)?;
                 },
                 InstructionType::CopyRegisterAToAdrAtRegisterB => {
-                    let Operand::Register { name } = &instr.opera else { unreachable!(); };
-                    let namea = name;
-                    let Operand::Register { name } = &instr.operb else { unreachable!(); };
-                    let nameb = name;
-
-                    writeln!(f, "    mov qword [{}], {}", nameb, namea)?;
+                    writeln!(f, "    mov [{}], {}", instr.operb, instr.opera)?;
                 },
                 InstructionType::Comment => {
-                    let Operand::Comment { comment } = &instr.opera else { unreachable!(); };
-
-                    writeln!(f, "; {}", comment)?;
+                    writeln!(f, "; {}", instr.opera)?;
                 }
             }
         }

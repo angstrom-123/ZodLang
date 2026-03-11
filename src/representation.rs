@@ -1,20 +1,31 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
-use crate::lexer::{Pos, Token, TokenType};
+use crate::lexer::{Lexer, Pos, Token, TokenType};
 use crate::parser::{DataType, NodeType, ParseNode, ParseTree};
 
-const REG_ORDER: [RegisterName; 6] = [
-    RegisterName::RDI,
-    RegisterName::RSI,
-    RegisterName::RDX,
-    RegisterName::RCX,
-    RegisterName::R8,
-    RegisterName::R9,
+const KERNEL_REG_ORDER: [Register; 7] = [
+    Register::RAX,
+    Register::RDI,
+    Register::RSI,
+    Register::RDX,
+    Register::R10,
+    Register::R9,
+    Register::R8,
+];
+
+const USER_REG_ORDER: [Register; 6] = [
+    Register::RDI,
+    Register::RSI,
+    Register::RDX,
+    Register::RCX,
+    Register::R8,
+    Register::R9,
 ];
 
 #[derive(Clone)]
 #[derive(Debug)]
+#[derive(PartialEq)]
 pub enum InstructionType {
     // Temporary,
     // Until i have an stdlib, these functions are hardcoded in asm, and are 
@@ -26,12 +37,17 @@ pub enum InstructionType {
 
     Comment,
 
+    StartDataSegment,
+
+    PushStackLiteralString,        // Pushes the adress of a literal string onto the stack
+    DeclareString,                 // Declare a new string (intended to be in the data segment)
+    Syscall,                       // Make a syscall
     PushStackRegister,             // Push a register onto the stack
     PushStackLiteralInt,           // Push a register onto the stack
     PopStack,                      // Pop the stack into a register
     AddRegisterBToA,               // Adds registers A and B, result in A
     MulRegisterAByB,               // Multiplies registers A by B, result in A
-    DivRCXByRAXManglingRDX,        // Divides RCX by RAX, mangles RDX, result in RAX
+    DivAByBManglingD,              // Divides A by B, mangles D, result in RAX
     SubRegisterBFromA,             // Subtracts registers B from A, result in A
     CopyRegisterBToA,              // Copy value from register B to register A 
     CopyRegisterToVar,             // Copy value from a register to variable 
@@ -56,110 +72,121 @@ pub enum InstructionType {
     DereferenceRegister,           // Dereferences the registers adress into itself
     SubLiteralIntFromRegister,     // Subtracts an immediate value from a register
 }
-
-#[derive(PartialEq)]
-pub enum ByteRegister {
-    AL,
-    CL,
-    DL,
-    BL,
-    SPL,
-    BPL,
-    SIL,
-    DIL,
-    R8B,
-    R9B,
-    R10B,
-    R11B,
-    R12B,
-    R13B,
-    R14B,
-    R15B
+#[derive(Clone, Copy, PartialEq)]
+pub enum RegisterSize {
+    Byte,
+    Word,
+    DWord,
+    QWord
 }
-impl fmt::Display for ByteRegister {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            ByteRegister::AL => write!(f, "al"),
-            ByteRegister::CL => write!(f, "cl"),
-            ByteRegister::DL => write!(f, "dl"),
-            ByteRegister::BL => write!(f, "bl"),
-            ByteRegister::SPL => write!(f, "spl"),
-            ByteRegister::BPL => write!(f, "bpl"),
-            ByteRegister::SIL => write!(f, "sil"),
-            ByteRegister::DIL => write!(f, "dil"),
-            ByteRegister::R8B => write!(f, "r8b"),
-            ByteRegister::R9B => write!(f, "r9b"),
-            ByteRegister::R10B  => write!(f, "r10b"),
-            ByteRegister::R11B  => write!(f, "r11b"),
-            ByteRegister::R12B  => write!(f, "r12b"),
-            ByteRegister::R13B  => write!(f, "r13b"),
-            ByteRegister::R14B  => write!(f, "r14b"),
-            ByteRegister::R15B  => write!(f, "r15b"),
+impl RegisterSize {
+    pub fn from_i64(size: i64) -> Self {
+        match size {
+            1 => RegisterSize::Byte,
+            2 => RegisterSize::Word,
+            4 => RegisterSize::DWord,
+            8 => RegisterSize::QWord,
+            _ => panic!("Invalid register size {}", size),
         }
     }
 }
 
 #[derive(PartialEq)]
 #[derive(Clone, Copy)]
-pub enum RegisterName {
-    RAX,
-    RCX,
-    RDX,
-    RBX,
-    RSP,
-    RBP,
-    RSI,
-    RDI,
-    R8,
-    R9,
-    R10,
-    R11,
-    R12,
-    R13,
-    R14,
-    R15
+pub enum Register {
+    RAX = 0,
+    RCX = 1,
+    RDX = 2,
+    RBX = 3,
+    RSP = 4,
+    RBP = 5,
+    RSI = 6,
+    RDI = 7,
+    R8 = 8,
+    R9 = 9,
+    R10 = 10,
+    R11 = 11,
+    R12 = 12,
+    R13 = 13,
+    R14 = 14,
+    R15 = 15
 }
-impl fmt::Display for RegisterName {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            RegisterName::RAX => write!(f, "rax"),
-            RegisterName::RCX => write!(f, "rcx"),
-            RegisterName::RDX => write!(f, "rdx"),
-            RegisterName::RBX => write!(f, "rbx"),
-            RegisterName::RSP => write!(f, "rsp"),
-            RegisterName::RBP => write!(f, "rbp"),
-            RegisterName::RSI => write!(f, "rsi"),
-            RegisterName::RDI => write!(f, "rdi"),
-            RegisterName::R8 => write!(f, "r8"),
-            RegisterName::R9 => write!(f, "r9"),
-            RegisterName::R10 => write!(f, "r10"),
-            RegisterName::R11 => write!(f, "r11"),
-            RegisterName::R12 => write!(f, "r12"),
-            RegisterName::R13 => write!(f, "r13"),
-            RegisterName::R14 => write!(f, "r14"),
-            RegisterName::R15 => write!(f, "r15"),
-        }
-    }
-}
-impl RegisterName {
-    pub fn as_byte(&self) -> ByteRegister {
-        match *self {
-            RegisterName::RAX => ByteRegister::AL,
-            RegisterName::RCX => ByteRegister::CL,
-            RegisterName::RDX => ByteRegister::DL,
-            RegisterName::RBX => ByteRegister::BL,
-            RegisterName::RSP => ByteRegister::SPL,
-            RegisterName::RBP => ByteRegister::BPL,
-            RegisterName::RSI => ByteRegister::SIL,
-            RegisterName::RDI => ByteRegister::DIL,
-            RegisterName::R8 => ByteRegister::R8B,
-            RegisterName::R9 => ByteRegister::R9B,
-            RegisterName::R10 => ByteRegister::R10B,
-            RegisterName::R11 => ByteRegister::R11B,
-            RegisterName::R12 => ByteRegister::R12B,
-            RegisterName::R13 => ByteRegister::R13B,
-            RegisterName::R14 => ByteRegister::R14B,
-            RegisterName::R15 => ByteRegister::R15B,
+impl Register {
+    fn size(&self, size: i64) -> &'static str {
+        let size: RegisterSize = RegisterSize::from_i64(size);
+        match size {
+            RegisterSize::Byte => match self {
+                Register::RAX => "al",
+                Register::RCX => "cl",
+                Register::RDX => "dl",
+                Register::RBX => "bl",
+                Register::RSP => "spl",
+                Register::RBP => "bpl",
+                Register::RSI => "sil",
+                Register::RDI => "dil",
+                Register::R8 => "r8b",
+                Register::R9 => "r9b",
+                Register::R10 => "r10b",
+                Register::R11 => "r11b",
+                Register::R12 => "r12b",
+                Register::R13 => "r13b",
+                Register::R14 => "r14b",
+                Register::R15 => "r15b",
+            },
+            RegisterSize::Word => match self {
+                Register::RAX => "ax",
+                Register::RCX => "cx",
+                Register::RDX => "dx",
+                Register::RBX => "bx",
+                Register::RSP => "sp",
+                Register::RBP => "bp",
+                Register::RSI => "si",
+                Register::RDI => "di",
+                Register::R8 => "r8w",
+                Register::R9 => "r9w",
+                Register::R10 => "r10w",
+                Register::R11 => "r11w",
+                Register::R12 => "r12w",
+                Register::R13 => "r13w",
+                Register::R14 => "r14w",
+                Register::R15 => "r15w",
+            },
+            RegisterSize::DWord => match self {
+                Register::RAX => "eax",
+                Register::RCX => "ecx",
+                Register::RDX => "edx",
+                Register::RBX => "ebx",
+                Register::RSP => "esp",
+                Register::RBP => "ebp",
+                Register::RSI => "esi",
+                Register::RDI => "edi",
+                Register::R8 => "r8d",
+                Register::R9 => "r9d",
+                Register::R10 => "r10d",
+                Register::R11 => "r11d",
+                Register::R12 => "r12d",
+                Register::R13 => "r13d",
+                Register::R14 => "r14d",
+                Register::R15 => "r15d",
+            },
+            RegisterSize::QWord => match self {
+                Register::RAX => "rax",
+                Register::RCX => "rcx",
+                Register::RDX => "rdx",
+                Register::RBX => "rbx",
+                Register::RSP => "rsp",
+                Register::RBP => "rbp",
+                Register::RSI => "rsi",
+                Register::RDI => "rdi",
+                Register::R8 => "r8",
+                Register::R9 => "r9",
+                Register::R10 => "r10",
+                Register::R11 => "r11",
+                Register::R12 => "r12",
+                Register::R13 => "r13",
+                Register::R14 => "r14",
+                Register::R15 => "r15",
+            },
         }
     }
 }
@@ -168,7 +195,8 @@ impl RegisterName {
 pub enum Operand {
     None,
     Register {
-        name: RegisterName,
+        name: Register,
+        size: i64
     },
     StackOffset {
         value: i64,
@@ -179,6 +207,9 @@ pub enum Operand {
     Name {
         name: Label,
     },
+    Bytes {
+        bytes: Vec<u8>,
+    },
     Comment {
         comment: String,
     },
@@ -187,12 +218,20 @@ impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Operand::None => write!(f, "None"),
-            Operand::Register { name } => write!(f, "Register `{}`", name),
-            Operand::StackOffset { value } => write!(f, "Stack Offset `{}`", value),
-            Operand::LiteralInt { value } => write!(f, "Literal Int `{}`", value),
-            Operand::Comment { comment } => write!(f, "Comment `{}`", comment),
-            Operand::Name { name } => write!(f, "Name `{}`", name),
+            Operand::Register { name, size } => write!(f, "{}", name.size(*size)),
+            Operand::StackOffset { value } => write!(f, "{}{}", if *value < 0 { "" } else { "+" }, value),
+            Operand::LiteralInt { value } => write!(f, "{}", value),
+            Operand::Comment { comment } => write!(f, "{}", comment),
+            Operand::Name { name } => write!(f, "{}", name),
+            Operand::Bytes { bytes } => write!(f, "{}", bytes.iter().map(|b| format!("0x{:02X}", b).to_string()).collect::<Vec<String>>().join(","))
         }
+    }
+}
+impl Operand {
+    pub fn byte(&self) -> String {
+        if let Operand::Register { name, size: _ } = self {
+            format!("{}", Operand::Register { name: *name, size: 1 })
+        } else { panic!("Cannot convert non-register operands to byte") }
     }
 }
 
@@ -247,116 +286,140 @@ impl Instruction {
         }
     }
 
-    fn _sub_literal_int_from_register(value: i64, name: RegisterName) -> Self {
+    fn _declare_string(index: i64, bytes: Vec<u8>) -> Self {
         Instruction {
-            kind: InstructionType::SubLiteralIntFromRegister,
-            opera: Operand::LiteralInt { value },
-            operb: Operand::Register { name },
+            kind: InstructionType::DeclareString,
+            opera: Operand::LiteralInt { value: index },
+            operb: Operand::Bytes { bytes },
         }
     }
 
-
-    fn _push_stack_register(name: RegisterName) -> Self {
+    fn _push_stack_literal_string(index: i64) -> Self {
         Instruction {
-            kind: InstructionType::PushStackRegister,
-            opera: Operand::Register { name },
+            kind: InstructionType::PushStackLiteralString,
+            opera: Operand::LiteralInt { value: index },
             operb: Operand::None,
         }
     }
 
-    fn _copy_var_val_to_register(name: RegisterName, var: Var) -> Self {
+    fn _start_data_segment() -> Self {
         Instruction {
-            kind: InstructionType::CopyVarValToRegister,
-            opera: Operand::Register { name },
-            operb: Operand::StackOffset { value: var.offset },
-        }
-    }
-
-    fn _copy_literal_int_to_register(name: RegisterName, val: i64) -> Self {
-        Instruction {
-            kind: InstructionType::CopyLiteralIntToRegister,
-            opera: Operand::Register { name },
-            operb: Operand::LiteralInt { value: val },
-        }
-    }
-
-    fn _zero_register(name: RegisterName) -> Self {
-        Instruction {
-            kind: InstructionType::ZeroRegister,
-            opera: Operand::Register { name },
-            operb: Operand::None,
-        }
-    }
-
-    fn _negate_register(name: RegisterName) -> Self {
-        Instruction {
-            kind: InstructionType::NegateRegister,
-            opera: Operand::Register { name },
-            operb: Operand::None,
-        }
-    }
-
-    fn _pop_stack(name: RegisterName) -> Self {
-        Instruction {
-            kind: InstructionType::PopStack,
-            opera: Operand::Register { name },
-            operb: Operand::None,
-        }
-    }
-
-    fn _dereference_register(name: RegisterName) -> Self {
-        Instruction {
-            kind: InstructionType::DereferenceRegister,
-            opera: Operand::Register { name },
-            operb: Operand::None,
-        }
-    }
-
-    fn _copy_register_to_var(var: Var, register: RegisterName) -> Self {
-        Instruction {
-            kind: InstructionType::CopyRegisterToVar,
-            opera: Operand::StackOffset { value: var.offset },
-            operb: Operand::Register { name: register },
-        }
-    }
-
-    fn _sub_register_b_from_a(a: RegisterName, b: RegisterName) -> Self {
-        Instruction {
-            kind: InstructionType::SubRegisterBFromA,
-            opera: Operand::Register { name: a },
-            operb: Operand::Register { name: b },
-        }
-    }
-
-    fn _add_register_b_to_a(a: RegisterName, b: RegisterName) -> Self {
-        Instruction {
-            kind: InstructionType::AddRegisterBToA,
-            opera: Operand::Register { name: a },
-            operb: Operand::Register { name: b },
-        }
-    }
-
-    fn _mul_register_a_by_b(a: RegisterName, b: RegisterName) -> Self {
-        Instruction {
-            kind: InstructionType::MulRegisterAByB,
-            opera: Operand::Register { name: a },
-            operb: Operand::Register { name: b },
-        }
-    }
-
-    fn _div_rcx_by_rax_mangling_rdx() -> Self {
-        Instruction {
-            kind: InstructionType::DivRCXByRAXManglingRDX,
+            kind: InstructionType::StartDataSegment,
             opera: Operand::None,
             operb: Operand::None,
         }
     }
 
-    fn _copy_register_b_to_a(a: RegisterName, b: RegisterName) -> Self {
+    fn _sub_literal_int_from_register(value: i64, name: Register, size: i64) -> Self {
+        Instruction {
+            kind: InstructionType::SubLiteralIntFromRegister,
+            opera: Operand::LiteralInt { value },
+            operb: Operand::Register { name, size },
+        }
+    }
+
+
+    fn _push_stack_register(name: Register) -> Self {
+        Instruction {
+            kind: InstructionType::PushStackRegister,
+            opera: Operand::Register { name, size: 8 },
+            operb: Operand::None,
+        }
+    }
+
+    fn _copy_var_val_to_register(name: Register, var: Var, size: i64) -> Self {
+        Instruction {
+            kind: InstructionType::CopyVarValToRegister,
+            opera: Operand::Register { name, size },
+            operb: Operand::StackOffset { value: var.offset },
+        }
+    }
+
+    fn _copy_literal_int_to_register(name: Register, val: i64, size: i64) -> Self {
+        Instruction {
+            kind: InstructionType::CopyLiteralIntToRegister,
+            opera: Operand::Register { name, size },
+            operb: Operand::LiteralInt { value: val },
+        }
+    }
+
+    fn _zero_register(name: Register, size: i64) -> Self {
+        Instruction {
+            kind: InstructionType::ZeroRegister,
+            opera: Operand::Register { name, size },
+            operb: Operand::None,
+        }
+    }
+
+    fn _negate_register(name: Register, size: i64) -> Self {
+        Instruction {
+            kind: InstructionType::NegateRegister,
+            opera: Operand::Register { name, size },
+            operb: Operand::None,
+        }
+    }
+
+    fn _pop_stack(name: Register) -> Self {
+        Instruction {
+            kind: InstructionType::PopStack,
+            opera: Operand::Register { name, size: 8 },
+            operb: Operand::None,
+        }
+    }
+
+    fn _dereference_register(name: Register, size: i64) -> Self {
+        Instruction {
+            kind: InstructionType::DereferenceRegister,
+            opera: Operand::Register { name, size },
+            operb: Operand::None,
+        }
+    }
+
+    fn _copy_register_to_var(var: Var, name: Register, size: i64) -> Self {
+        Instruction {
+            kind: InstructionType::CopyRegisterToVar,
+            opera: Operand::StackOffset { value: var.offset },
+            operb: Operand::Register { name, size },
+        }
+    }
+
+    fn _sub_register_b_from_a(a: Register, b: Register, size: i64) -> Self {
+        Instruction {
+            kind: InstructionType::SubRegisterBFromA,
+            opera: Operand::Register { name: a, size },
+            operb: Operand::Register { name: b, size },
+        }
+    }
+
+    fn _add_register_b_to_a(a: Register, b: Register, size: i64) -> Self {
+        Instruction {
+            kind: InstructionType::AddRegisterBToA,
+            opera: Operand::Register { name: a, size },
+            operb: Operand::Register { name: b, size },
+        }
+    }
+
+    fn _mul_register_a_by_b(a: Register, b: Register, size: i64) -> Self {
+        Instruction {
+            kind: InstructionType::MulRegisterAByB,
+            opera: Operand::Register { name: a, size },
+            operb: Operand::Register { name: b, size },
+        }
+    }
+
+    fn _div_a_by_b_mangling_d(a: Register, b: Register, size: i64) -> Self {
+        Instruction {
+            kind: InstructionType::DivAByBManglingD,
+            opera: Operand::Register { name: a, size },
+            operb: Operand::Register { name: b, size },
+        }
+    }
+
+    fn _copy_register_b_to_a(a: Register, b: Register, size: i64) -> Self {
         Instruction {
             kind: InstructionType::CopyRegisterBToA,
-            opera: Operand::Register { name: a },
-            operb: Operand::Register { name: b },
+            opera: Operand::Register { name: a, size },
+            operb: Operand::Register { name: b, size },
         }
     }
 
@@ -376,10 +439,10 @@ impl Instruction {
         }
     }
 
-    fn _jump_if_zero(reg: RegisterName, label: &Label) -> Self {
+    fn _jump_if_zero(name: Register, label: &Label, size: i64) -> Self {
         Instruction {
             kind: InstructionType::JumpIfZero,
-            opera: Operand::Register { name: reg },
+            opera: Operand::Register { name, size },
             operb: Operand::Name { name: label.clone() },
         }
     }
@@ -408,6 +471,14 @@ impl Instruction {
         }
     }
 
+    fn _syscall() -> Self {
+        Instruction {
+            kind: InstructionType::Syscall,
+            opera: Operand::None,
+            operb: Operand::None,
+        }
+    }
+
     fn _push_stack_literal_int(val: i64) -> Self {
         Instruction { 
             kind: InstructionType::PushStackLiteralInt,
@@ -416,67 +487,67 @@ impl Instruction {
         }
     }
 
-    fn _register_b_less_a(a: RegisterName, b: RegisterName) -> Self {
+    fn _register_b_less_a(a: Register, b: Register, size: i64) -> Self {
         Instruction {
             kind: InstructionType::RegisterBLessA,
-            opera: Operand::Register { name: a },
-            operb: Operand::Register { name: b },
+            opera: Operand::Register { name: a, size },
+            operb: Operand::Register { name: b, size },
         }
     }
 
-    fn _register_b_less_eq_a(a: RegisterName, b: RegisterName) -> Self {
+    fn _register_b_less_eq_a(a: Register, b: Register, size: i64) -> Self {
         Instruction {
             kind: InstructionType::RegisterBLessEqA,
-            opera: Operand::Register { name: a },
-            operb: Operand::Register { name: b },
+            opera: Operand::Register { name: a, size },
+            operb: Operand::Register { name: b, size },
         }
     }
 
-    fn _register_b_greater_a(a: RegisterName, b: RegisterName) -> Self {
+    fn _register_b_greater_a(a: Register, b: Register, size: i64) -> Self {
         Instruction {
             kind: InstructionType::RegisterBGreaterA,
-            opera: Operand::Register { name: a },
-            operb: Operand::Register { name: b },
+            opera: Operand::Register { name: a, size },
+            operb: Operand::Register { name: b, size },
         }
     }
 
-    fn _register_b_greater_eq_a(a: RegisterName, b: RegisterName) -> Self {
+    fn _register_b_greater_eq_a(a: Register, b: Register, size: i64) -> Self {
         Instruction {
             kind: InstructionType::RegisterBGreaterEqA,
-            opera: Operand::Register { name: a },
-            operb: Operand::Register { name: b },
+            opera: Operand::Register { name: a, size },
+            operb: Operand::Register { name: b, size },
         }
     }
 
-    fn _register_b_eq_a(a: RegisterName, b: RegisterName) -> Self {
+    fn _register_b_eq_a(a: Register, b: Register, size: i64) -> Self {
         Instruction {
             kind: InstructionType::RegisterBEqA,
-            opera: Operand::Register { name: a },
-            operb: Operand::Register { name: b },
+            opera: Operand::Register { name: a, size },
+            operb: Operand::Register { name: b, size },
         }
     }
 
-    fn _register_b_neq_a(a: RegisterName, b: RegisterName) -> Self {
+    fn _register_b_neq_a(a: Register, b: Register, size: i64) -> Self {
         Instruction {
             kind: InstructionType::RegisterBNEqA,
-            opera: Operand::Register { name: a },
-            operb: Operand::Register { name: b },
+            opera: Operand::Register { name: a, size },
+            operb: Operand::Register { name: b, size },
         }
     }
 
-    fn _literal_int_a_neq_register_b(a: i64, b: RegisterName) -> Self {
+    fn _literal_int_a_neq_register_b(a: i64, b: Register, size: i64) -> Self {
         Instruction {
             kind: InstructionType::RegisterBNEqLiteralIntA,
             opera: Operand::LiteralInt { value: a },
-            operb: Operand::Register { name: b },
+            operb: Operand::Register { name: b, size },
         }
     }
 
-    fn _copy_register_a_to_adr_at_register_b(a: RegisterName, b: RegisterName) -> Self {
+    fn _copy_register_a_to_adr_at_register_b(a: Register, b: Register, size: i64) -> Self {
         Instruction {
             kind: InstructionType::CopyRegisterAToAdrAtRegisterB,
-            opera: Operand::Register { name: a },
-            operb: Operand::Register { name: b },
+            opera: Operand::Register { name: a, size },
+            operb: Operand::Register { name: b, size },
         }
     }
 }
@@ -569,9 +640,8 @@ impl Context {
 
 pub struct IR {
     pub instrs: Vec<Instruction>,
-
-    // vars: HashSet<Var>,
     labels: HashSet<Label>,
+    strs: Vec<Vec<u8>>,
 }
 impl Default for IR {
     fn default() -> Self {
@@ -582,8 +652,8 @@ impl IR {
     pub fn new() -> Self {
         IR {
             instrs: Vec::new(),
-            // vars: HashSet::new(),
             labels: HashSet::new(),
+            strs: Vec::new(),
         }
     }
 
@@ -624,8 +694,8 @@ impl IR {
 
             // Prologue
             self.instrs.append(&mut vec![
-                Instruction::_push_stack_register(RegisterName::RBP),
-                Instruction::_copy_register_b_to_a(RegisterName::RBP, RegisterName::RSP),
+                Instruction::_push_stack_register(Register::RBP),
+                Instruction::_copy_register_b_to_a(Register::RBP, Register::RSP, 8),
             ]);
 
             // Args and context
@@ -637,11 +707,14 @@ impl IR {
                     panic!("{} Error: Currently only up to 6 function args are supported", func.tok.pos);
                 }
 
+                self.instrs.push(Instruction::_comment("Args"));
+
                 // Save args as local variables on the stack
                 for (i, arg) in args.children.iter().enumerate() {
-                    let reg: RegisterName = REG_ORDER[i];
+                    let reg: Register = USER_REG_ORDER[i];
                     self.instrs.push(Instruction::_push_stack_register(reg));
 
+                    assert!(!matches!(arg.datatype, DataType::None | DataType::Unknown), "Variable type must be known");
                     let var: Var = Var {
                         typ: arg.datatype.clone(),
                         offset: ctx.stack_ix,
@@ -651,9 +724,9 @@ impl IR {
                 }
             }
 
-
             // Body
             if let Some(body) = func.children.get(1) {
+                self.instrs.push(Instruction::_comment("Body"));
                 for stmt in &body.children {
                     self.generate_from_statement(stmt, &mut ctx);
                 }
@@ -667,11 +740,48 @@ impl IR {
 
             // On a local stack frame so we automatically deallocate the locals when returning
             self.instrs.append(&mut vec![
-                Instruction::_copy_register_b_to_a(RegisterName::RSP, RegisterName::RBP),
-                Instruction::_pop_stack(RegisterName::RBP),
+                Instruction::_copy_register_b_to_a(Register::RSP, Register::RBP, 8),
+                Instruction::_pop_stack(Register::RBP),
                 Instruction::_return_to_caller(),
             ]);
         }
+
+        self.instrs.push(Instruction::_start_data_segment());
+        for (i, s) in self.strs.iter().enumerate() {
+            self.instrs.push(Instruction::_declare_string(i as i64, s.clone()));
+        }
+    }
+
+    // Calling Convention:
+    //      Int and Ptr args in:
+    //          RDI 
+    //          RSI
+    //          RDX 
+    //          RCX 
+    //          R10
+    //          R9
+    //          R8 
+    //      Return value in:
+    //          RAX 
+    fn generate_syscall(&mut self, call: &ParseNode, _ctx: &mut Context) {
+        if call.children.len() > 7 {
+            panic!("{} Error: Passing to many args to syscall. Maximum is 7", call.tok.pos);
+        }
+
+        self.instrs.push(Instruction::_comment("Syscall"));
+
+        // Calling convention puts first few args into registers
+        for (i, reg) in KERNEL_REG_ORDER.iter().enumerate() {
+            if i == call.children.len() {
+                break;
+            }
+            self.instrs.push(Instruction::_pop_stack(*reg));
+        }
+
+        self.instrs.append(&mut vec![
+            Instruction::_syscall(),
+            Instruction::_push_stack_register(Register::RAX)
+        ]);
     }
 
     // Calling Convention:
@@ -682,25 +792,20 @@ impl IR {
     //          RCX 
     //          R8 
     //          R9
-    //
     //      Excess args on stack
-    //          Pushed in normal order, so args need to be pulled in right to left 
-    //          from the stack.
-    //          
-    //          Maybe no stack arg passing for now.
-    //
     //      Return value in:
     //          RAX 
     //          RAX + RDX (128 bit)
     fn generate_func_call(&mut self, call: &ParseNode, _ctx: &mut Context) {
         if call.children.len() > 6 {
-            panic!("{} Error: Passing to many args to function `{}`. Currently there is support for up to 6 args", call.tok.pos, call.tok.val_str());
+            panic!("{} Error: Passing to many args to function `{}`. Currently there is support for up to 6 args",
+                   call.tok.pos, call.tok.val_str());
         }
 
         self.instrs.push(Instruction::_comment("Function Call"));
 
         // Calling convention puts first few args into registers
-        for (i, reg) in REG_ORDER.iter().enumerate() {
+        for (i, reg) in USER_REG_ORDER.iter().enumerate() {
             if i == call.children.len() {
                 break;
             }
@@ -711,7 +816,7 @@ impl IR {
         self.instrs.push(Instruction::_call_function(&label));
 
         if call.datatype != DataType::None {
-            self.instrs.push(Instruction::_push_stack_register(RegisterName::RAX));
+            self.instrs.push(Instruction::_push_stack_register(Register::RAX));
         }
     }
 
@@ -721,6 +826,7 @@ impl IR {
             | NodeType::Continue
             | NodeType::Break
             | NodeType::Return
+            | NodeType::Syscall
             | NodeType::FuncCall => {
                 for node in &stmt.post_order() {
                     self.generate_from_node(node, ctx);
@@ -740,13 +846,13 @@ impl IR {
 
                 if let Some(lhs_group) = stmt.children.first() {
                     if lhs_group.kind == NodeType::UnaryOp && lhs_group.tok.kind == TokenType::OpDereference {
-                        let lhs: &ParseNode = lhs_group.children.first().expect("");
+                        let lhs: &ParseNode = lhs_group.children.first().unwrap();
                         if lhs.kind == NodeType::Var { // Dereferencing a var
                             if let Some(var) = ctx.locals.get(&lhs.tok.val) {
                                 self.instrs.append(&mut vec![
-                                    Instruction::_pop_stack(RegisterName::RAX),
-                                    Instruction::_copy_var_val_to_register(RegisterName::RBX, var.clone()), // address into rbx
-                                    Instruction::_copy_register_a_to_adr_at_register_b(RegisterName::RAX, RegisterName::RBX),
+                                    Instruction::_pop_stack(Register::RAX),
+                                    Instruction::_copy_var_val_to_register(Register::RBX, var.clone(), var.typ.size()), // address into rbx
+                                    Instruction::_copy_register_a_to_adr_at_register_b(Register::RAX, Register::RBX, 8),
                                 ]);
                             } else {
                                 panic!("{} Error: Attempting to assign undeclared variable `{}`", stmt.tok.pos, lhs.tok.val_str());
@@ -756,19 +862,37 @@ impl IR {
                                 self.generate_from_node(node, ctx);
                             }
                             self.instrs.append(&mut vec![
-                                Instruction::_pop_stack(RegisterName::RBX), // lhs
-                                Instruction::_pop_stack(RegisterName::RAX), // rhs
-                                Instruction::_copy_register_a_to_adr_at_register_b(RegisterName::RAX, RegisterName::RBX),
+                                Instruction::_pop_stack(Register::RBX), // lhs
+                                Instruction::_pop_stack(Register::RAX), // rhs
+                                Instruction::_copy_register_a_to_adr_at_register_b(Register::RAX, Register::RBX, 8),
                             ]);
                         }
                     } else if lhs_group.kind == NodeType::Var {
                         if let Some(var) = ctx.locals.get(&lhs_group.tok.val) {
                             self.instrs.append(&mut vec![
-                                Instruction::_pop_stack(RegisterName::RAX),
-                                Instruction::_copy_register_to_var(var.clone(), RegisterName::RAX)
+                                Instruction::_pop_stack(Register::RAX),
+                                Instruction::_copy_register_to_var(var.clone(), Register::RAX, var.typ.size())
                             ]);
                         } else {
                             panic!("{} Error: Attempting to assign undeclared variable `{}`", stmt.tok.pos, lhs_group.tok.val_str());
+                        }
+                    } else if lhs_group.kind == NodeType::BinaryOp && lhs_group.tok.kind == TokenType::OpSubscript {
+                        let lhs: &ParseNode = lhs_group.children.first().unwrap();
+                        let rhs: &ParseNode = lhs_group.children.last().unwrap();
+                        self.generate_from_node(rhs, ctx);
+                        if let Some(var) = ctx.locals.get(&lhs.tok.val) {
+                            let size: i64 = var.typ.base_type().unwrap().size();
+                            self.instrs.append(&mut vec![
+                                Instruction::_pop_stack(Register::RBX), // index
+                                Instruction::_pop_stack(Register::RAX), // value
+                                Instruction::_copy_literal_int_to_register(Register::RCX, size, 8), // sizeof type
+                                Instruction::_mul_register_a_by_b(Register::RBX, Register::RCX, 8), // offset
+                                Instruction::_copy_var_val_to_register(Register::RDX, var.clone(), 8), // address into rcx
+                                Instruction::_add_register_b_to_a(Register::RDX, Register::RBX, 8), // add offset to addy
+                                Instruction::_copy_register_a_to_adr_at_register_b(Register::RAX, Register::RDX, 8), // assign
+                            ]);
+                        } else {
+                            panic!("{} Error: Attempting to assign undeclared variable `{}`", stmt.tok.pos, lhs.tok.val_str());
                         }
                     } else {
                         panic!("{} Error: Unexpected lhs in assignment `{}`", lhs_group.tok.pos, lhs_group.tok.val_str());
@@ -793,9 +917,9 @@ impl IR {
                     for node in &cond.post_order() {
                         self.generate_from_node(node, ctx);
                     }
+                    self.instrs.push(Instruction::_pop_stack(Register::RAX));
+                    self.instrs.push(Instruction::_jump_if_zero(Register::RAX, &end_label, cond.datatype.size()));
                 }
-                self.instrs.push(Instruction::_pop_stack(RegisterName::RAX));
-                self.instrs.push(Instruction::_jump_if_zero(RegisterName::RAX, &end_label));
 
                 // Body
                 let mut while_ctx: Context = Context::under(&stmt.tok, ctx);
@@ -863,9 +987,10 @@ impl IR {
                     for node in &cond.post_order() {
                         self.generate_from_node(node, ctx);
                     }
+
+                    self.instrs.push(Instruction::_pop_stack(Register::RAX));
+                    self.instrs.push(Instruction::_jump_if_zero(Register::RAX, &end_label, cond.datatype.size()));
                 }
-                self.instrs.push(Instruction::_pop_stack(RegisterName::RAX));
-                self.instrs.push(Instruction::_jump_if_zero(RegisterName::RAX, &end_label));
 
                 // Body
                 if let Some(body) = stmt.children.get(4) && !body.is_null() {
@@ -916,16 +1041,15 @@ impl IR {
                 let mut end_label: Label = Label::new_at(".end_", &stmt.tok.pos());
 
                 // Condition 
-                if let Some(cond) = stmt.children.first() {
-                    for node in &cond.post_order() {
-                        self.generate_from_node(node, ctx);
-                    }
+                let cond: &ParseNode = stmt.children.first().unwrap();
+                for node in &cond.post_order() {
+                    self.generate_from_node(node, ctx);
                 }
-                self.instrs.push(Instruction::_pop_stack(RegisterName::RAX));
+                self.instrs.push(Instruction::_pop_stack(Register::RAX));
 
                 if stmt.children.len() == 2 { // There is no else block
                     // Jump to end if condition fails
-                    self.instrs.push(Instruction::_jump_if_zero(RegisterName::RAX, &end_label));
+                    self.instrs.push(Instruction::_jump_if_zero(Register::RAX, &end_label, cond.datatype.size()));
 
                     // If body
                     self.instrs.push(Instruction::_comment("If"));
@@ -949,7 +1073,7 @@ impl IR {
                     // Jump to else if condition fails
                     let mut else_label: Label = Label::new_at(".else_", &stmt.tok.pos());
 
-                    self.instrs.push(Instruction::_jump_if_zero(RegisterName::RAX, &else_label));
+                    self.instrs.push(Instruction::_jump_if_zero(Register::RAX, &else_label, cond.datatype.size()));
 
                     // If block
                     self.instrs.push(Instruction::_comment("If"));
@@ -993,91 +1117,91 @@ impl IR {
                     TokenType::OpPlus => {
                         self.instrs.push(Instruction::_comment("BinOp Plus"));
                         self.instrs.append(&mut vec![
-                            Instruction::_pop_stack(RegisterName::RAX),
-                            Instruction::_pop_stack(RegisterName::RBX),
-                            Instruction::_add_register_b_to_a(RegisterName::RAX, RegisterName::RBX),
-                            Instruction::_push_stack_register(RegisterName::RAX),
+                            Instruction::_pop_stack(Register::RAX),
+                            Instruction::_pop_stack(Register::RBX),
+                            Instruction::_add_register_b_to_a(Register::RAX, Register::RBX, node.datatype.size()),
+                            Instruction::_push_stack_register(Register::RAX),
                         ]);
                     },
                     TokenType::OpMinus => {
                         self.instrs.push(Instruction::_comment("BinOp Minus"));
                         self.instrs.append(&mut vec![
-                            Instruction::_pop_stack(RegisterName::RBX),
-                            Instruction::_pop_stack(RegisterName::RAX),
-                            Instruction::_sub_register_b_from_a(RegisterName::RAX, RegisterName::RBX),
-                            Instruction::_push_stack_register(RegisterName::RAX),
+                            Instruction::_pop_stack(Register::RBX),
+                            Instruction::_pop_stack(Register::RAX),
+                            Instruction::_sub_register_b_from_a(Register::RAX, Register::RBX, node.datatype.size()),
+                            Instruction::_push_stack_register(Register::RAX),
                         ]);
                     },
                     TokenType::OpMul => {
                         self.instrs.push(Instruction::_comment("BinOp Mul"));
                         self.instrs.append(&mut vec![
-                            Instruction::_pop_stack(RegisterName::RAX),
-                            Instruction::_pop_stack(RegisterName::RBX),
-                            Instruction::_mul_register_a_by_b(RegisterName::RAX, RegisterName::RBX),
-                            Instruction::_push_stack_register(RegisterName::RAX),
+                            Instruction::_pop_stack(Register::RAX),
+                            Instruction::_pop_stack(Register::RBX),
+                            Instruction::_mul_register_a_by_b(Register::RAX, Register::RBX, node.datatype.size()),
+                            Instruction::_push_stack_register(Register::RAX),
                         ]);
                     },
                     TokenType::OpDiv => {
                         self.instrs.push(Instruction::_comment("BinOp Div"));
                         self.instrs.append(&mut vec![
-                            Instruction::_pop_stack(RegisterName::RCX),
-                            Instruction::_pop_stack(RegisterName::RAX),
-                            Instruction::_div_rcx_by_rax_mangling_rdx(),
-                            Instruction::_push_stack_register(RegisterName::RAX),
+                            Instruction::_pop_stack(Register::RBX),
+                            Instruction::_pop_stack(Register::RAX),
+                            Instruction::_div_a_by_b_mangling_d(Register::RAX, Register::RBX, node.datatype.size()),
+                            Instruction::_push_stack_register(Register::RAX),
                         ]);
                     },
                     TokenType::OpEqual => {
                         self.instrs.push(Instruction::_comment("BinOp Eq"));
                         self.instrs.append(&mut vec![
-                            Instruction::_pop_stack(RegisterName::RBX),
-                            Instruction::_pop_stack(RegisterName::RAX),
-                            Instruction::_register_b_eq_a(RegisterName::RAX, RegisterName::RBX),
-                            Instruction::_push_stack_register(RegisterName::RAX),
+                            Instruction::_pop_stack(Register::RBX),
+                            Instruction::_pop_stack(Register::RAX),
+                            Instruction::_register_b_eq_a(Register::RAX, Register::RBX, node.datatype.size()),
+                            Instruction::_push_stack_register(Register::RAX),
                         ]);
                     },
                     TokenType::OpNotEqual => {
                         self.instrs.push(Instruction::_comment("BinOp NEq"));
                         self.instrs.append(&mut vec![
-                            Instruction::_pop_stack(RegisterName::RBX),
-                            Instruction::_pop_stack(RegisterName::RAX),
-                            Instruction::_register_b_neq_a(RegisterName::RAX, RegisterName::RBX),
-                            Instruction::_push_stack_register(RegisterName::RAX),
+                            Instruction::_pop_stack(Register::RBX),
+                            Instruction::_pop_stack(Register::RAX),
+                            Instruction::_register_b_neq_a(Register::RAX, Register::RBX, node.datatype.size()),
+                            Instruction::_push_stack_register(Register::RAX),
                         ]);
                     },
                     TokenType::OpGreaterThan => {
                         self.instrs.push(Instruction::_comment("BinOp GT"));
                         self.instrs.append(&mut vec![
-                            Instruction::_pop_stack(RegisterName::RBX),
-                            Instruction::_pop_stack(RegisterName::RAX),
-                            Instruction::_register_b_greater_a(RegisterName::RAX, RegisterName::RBX),
-                            Instruction::_push_stack_register(RegisterName::RAX),
+                            Instruction::_pop_stack(Register::RBX),
+                            Instruction::_pop_stack(Register::RAX),
+                            Instruction::_register_b_greater_a(Register::RAX, Register::RBX, node.datatype.size()),
+                            Instruction::_push_stack_register(Register::RAX),
                         ]);
                     },
                     TokenType::OpLessThan => {
                         self.instrs.push(Instruction::_comment("BinOp LT"));
                         self.instrs.append(&mut vec![
-                            Instruction::_pop_stack(RegisterName::RBX),
-                            Instruction::_pop_stack(RegisterName::RAX),
-                            Instruction::_register_b_less_a(RegisterName::RAX, RegisterName::RBX),
-                            Instruction::_push_stack_register(RegisterName::RAX),
+                            Instruction::_pop_stack(Register::RBX),
+                            Instruction::_pop_stack(Register::RAX),
+                            Instruction::_register_b_less_a(Register::RAX, Register::RBX, node.datatype.size()),
+                            Instruction::_push_stack_register(Register::RAX),
                         ]);
                     },
                     TokenType::OpGreaterEqual => {
                         self.instrs.push(Instruction::_comment("BinOp GE"));
                         self.instrs.append(&mut vec![
-                            Instruction::_pop_stack(RegisterName::RBX),
-                            Instruction::_pop_stack(RegisterName::RAX),
-                            Instruction::_register_b_greater_eq_a(RegisterName::RAX, RegisterName::RBX),
-                            Instruction::_push_stack_register(RegisterName::RAX),
+                            Instruction::_pop_stack(Register::RBX),
+                            Instruction::_pop_stack(Register::RAX),
+                            Instruction::_register_b_greater_eq_a(Register::RAX, Register::RBX, node.datatype.size()),
+                            Instruction::_push_stack_register(Register::RAX),
                         ]);
                     },
                     TokenType::OpLessEqual => {
                         self.instrs.push(Instruction::_comment("BinOp LE"));
                         self.instrs.append(&mut vec![
-                            Instruction::_pop_stack(RegisterName::RBX),
-                            Instruction::_pop_stack(RegisterName::RAX),
-                            Instruction::_register_b_less_eq_a(RegisterName::RAX, RegisterName::RBX),
-                            Instruction::_push_stack_register(RegisterName::RAX),
+                            Instruction::_pop_stack(Register::RBX),
+                            Instruction::_pop_stack(Register::RAX),
+                            Instruction::_register_b_less_eq_a(Register::RAX, Register::RBX, node.datatype.size()),
+                            Instruction::_push_stack_register(Register::RAX),
                         ]);
                     },
                     TokenType::OpLogicalOr => {
@@ -1087,22 +1211,22 @@ impl IR {
                         let mut end_label: Label = Label::new_at(".end_", &node.tok.pos());
 
                         self.instrs.append(&mut vec![
-                            Instruction::_pop_stack(RegisterName::RAX),
-                            Instruction::_pop_stack(RegisterName::RBX),
-                            Instruction::_jump_if_zero(RegisterName::RAX, &rhs_label),
+                            Instruction::_pop_stack(Register::RAX),
+                            Instruction::_pop_stack(Register::RBX),
+                            Instruction::_jump_if_zero(Register::RAX, &rhs_label, node.datatype.size()),
                             Instruction::_jump_to_label(&end_label)
                         ]);
 
                         self.record_label(&mut rhs_label);
                         self.instrs.push(Instruction::_label(&rhs_label));
                         
-                        self.instrs.push(Instruction::_literal_int_a_neq_register_b(0, RegisterName::RBX));
-                        self.instrs.push(Instruction::_copy_register_b_to_a(RegisterName::RAX, RegisterName::RBX));
+                        self.instrs.push(Instruction::_literal_int_a_neq_register_b(0, Register::RBX, node.datatype.size()));
+                        self.instrs.push(Instruction::_copy_register_b_to_a(Register::RAX, Register::RBX, node.datatype.size()));
 
                         self.record_label(&mut end_label);
                         self.instrs.push(Instruction::_label(&end_label));
 
-                        self.instrs.push(Instruction::_push_stack_register(RegisterName::RAX));
+                        self.instrs.push(Instruction::_push_stack_register(Register::RAX));
                     },
                     TokenType::OpLogicalAnd => {
                         self.instrs.push(Instruction::_comment("BinOp Logical And"));
@@ -1111,21 +1235,43 @@ impl IR {
                         let mut end_label: Label = Label::new_at(".end_", &node.tok.pos());
 
                         self.instrs.append(&mut vec![
-                            Instruction::_pop_stack(RegisterName::RAX),
-                            Instruction::_pop_stack(RegisterName::RBX),
-                            Instruction::_jump_if_zero(RegisterName::RAX, &end_label),
+                            Instruction::_pop_stack(Register::RAX),
+                            Instruction::_pop_stack(Register::RBX),
+                            Instruction::_jump_if_zero(Register::RAX, &end_label, node.datatype.size()),
                             Instruction::_jump_to_label(&rhs_label)
                         ]);
 
                         self.record_label(&mut rhs_label);
                         self.instrs.push(Instruction::_label(&rhs_label));
                         
-                        self.instrs.push(Instruction::_literal_int_a_neq_register_b(0, RegisterName::RBX));
+                        self.instrs.push(Instruction::_literal_int_a_neq_register_b(0, Register::RBX, node.datatype.size()));
 
                         self.record_label(&mut end_label);
                         self.instrs.push(Instruction::_label(&end_label));
 
-                        self.instrs.push(Instruction::_push_stack_register(RegisterName::RAX));
+                        self.instrs.push(Instruction::_push_stack_register(Register::RAX));
+                    },
+                    TokenType::OpSubscript => {
+                        // Stack contains var, index
+                        let lhs: &ParseNode = node.children.first().unwrap();
+                        let size: i64;
+                        if let Some(var) = ctx.locals.get(&lhs.tok.val) {
+                            size = var.typ.base_type().unwrap().size();
+                        } else {
+                            panic!("{} Error: Attempting to assign undeclared variable `{}`", lhs.tok.pos, lhs.tok.val_str());
+                        }
+                        // TODO
+
+                        self.instrs.append(&mut vec![
+                            Instruction::_comment("BinOp Subscript"),
+                            Instruction::_pop_stack(Register::RBX), // index
+                            Instruction::_pop_stack(Register::RAX), // var
+                            Instruction::_copy_literal_int_to_register(Register::RCX, size, 8), // sizeof var type
+                            Instruction::_mul_register_a_by_b(Register::RBX, Register::RCX, 8), // offset
+                            Instruction::_add_register_b_to_a(Register::RAX, Register::RBX, 8), // add offset to addy
+                            Instruction::_dereference_register(Register::RAX, 8),
+                            Instruction::_push_stack_register(Register::RAX),
+                        ]);
                     },
                     _ => unreachable!(),
                 }
@@ -1135,40 +1281,43 @@ impl IR {
                     TokenType::OpMinus => {
                         self.instrs.push(Instruction::_comment("UnOp Minus"));
                         self.instrs.append(&mut vec![
-                            Instruction::_pop_stack(RegisterName::RAX),
-                            Instruction::_negate_register(RegisterName::RAX),
-                            Instruction::_push_stack_register(RegisterName::RAX),
+                            Instruction::_pop_stack(Register::RAX),
+                            Instruction::_negate_register(Register::RAX, node.datatype.size()),
+                            Instruction::_push_stack_register(Register::RAX),
                         ]);
                     },
                     TokenType::OpDereference => {
                         self.instrs.push(Instruction::_comment("UnOp Dereference"));
                         self.instrs.append(&mut vec![
-                            Instruction::_pop_stack(RegisterName::RAX),
-                            Instruction::_dereference_register(RegisterName::RAX),
-                            Instruction::_push_stack_register(RegisterName::RAX),
+                            Instruction::_pop_stack(Register::RAX),
+                            Instruction::_dereference_register(Register::RAX, 8),
+                            Instruction::_push_stack_register(Register::RAX),
                         ]);
                     },
                     _ => unreachable!(),
                 }
             },
-            NodeType::LiteralPointer => {
-                self.instrs.push(Instruction::_comment("Literal Int"));
-                let mut val_str: String = node.tok.val_str();
-                val_str.pop();
-                let lit: i64 = val_str.parse::<i64>().unwrap();
-                self.instrs.push(Instruction::_push_stack_literal_int(lit));
-            },
             NodeType::LiteralInt => {
                 self.instrs.push(Instruction::_comment("Literal Int"));
-                let lit: i64 = node.tok.val_str().parse::<i64>().unwrap();
+                let lit: i64 = Lexer::vec_val(&node.tok.val);
+                self.instrs.push(Instruction::_push_stack_literal_int(lit));
+            },
+            NodeType::LiteralString => {
+                self.instrs.push(Instruction::_comment("Literal String"));
+                self.instrs.push(Instruction::_push_stack_literal_string(self.strs.len() as i64));
+                self.strs.push(node.tok.val.clone());
+            },
+            NodeType::LiteralChar => {
+                self.instrs.push(Instruction::_comment("Literal Char"));
+                let lit: i64 = *node.tok.val.first().unwrap() as i64;
                 self.instrs.push(Instruction::_push_stack_literal_int(lit));
             },
             NodeType::Var => {
                 self.instrs.push(Instruction::_comment("Var"));
                 let var: Option<&Var> = ctx.locals.get(&node.tok.val);
                 if let Some(var) = var {
-                    self.instrs.push(Instruction::_copy_var_val_to_register(RegisterName::RAX, var.clone()));
-                    self.instrs.push(Instruction::_push_stack_register(RegisterName::RAX));
+                    self.instrs.push(Instruction::_copy_var_val_to_register(Register::RAX, var.clone(), var.typ.size()));
+                    self.instrs.push(Instruction::_push_stack_register(Register::RAX));
                 } else {
                     panic!("{} Error: Could not find variable `{}`", node.tok.pos, node.tok.val_str());
                 }
@@ -1186,8 +1335,9 @@ impl IR {
                 ctx.locals.insert(node.tok.val.clone(), var);
                 ctx.stack_ix -= 8;
 
-                self.instrs.push(Instruction::_sub_literal_int_from_register(8, RegisterName::RSP));
+                self.instrs.push(Instruction::_sub_literal_int_from_register(8, Register::RSP, 8));
             },
+            NodeType::Syscall => self.generate_syscall(node, ctx),
             NodeType::FuncCall => self.generate_func_call(node, ctx),
             NodeType::Continue => {
                 if ctx.ident.kind == TokenType::None {
@@ -1215,7 +1365,7 @@ impl IR {
                 self.instrs.push(Instruction::_comment("Return"));
 
                 // Return type in RAX
-                self.instrs.push(Instruction::_pop_stack(RegisterName::RAX));
+                self.instrs.push(Instruction::_pop_stack(Register::RAX));
                 self.instrs.push(Instruction::_jump_to_label(&Label::new(".epilogue")));
             },
             _ => panic!("{} Error: Unexpected node type in IR gen `{:?}`", node.tok.pos, node.kind)

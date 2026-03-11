@@ -21,6 +21,7 @@ pub enum TokenType {
     OpLogicalOr,
     OpLogicalAnd,
     OpDereference,
+    OpSubscript,
     KeywordReturn,
     KeywordIf,
     KeywordElse,
@@ -30,52 +31,67 @@ pub enum TokenType {
     KeywordWhile,
     TypeInt64,
     TypeInt64Ptr,
+    TypeChr,
+    TypeChrPtr,
+    TypeAnyPtr,
+    Int,
+    String,
+    Char,
+    Syscall,
     End,
     Separator,
     OpenParen,
     CloseParen,
+    OpenSquare,
+    CloseSquare,
     OpenScope,
     CloseScope,
     Identifier,
-    Int,
-    Pointer,
 }
 impl TokenType {
     pub fn val_str(&self) -> &'static str {
         match self {
-            TokenType::None             => "",
-            TokenType::OpPlus           => "+",
-            TokenType::OpMinus          => "-",
-            TokenType::OpMul            => "*",
-            TokenType::OpDiv            => "/",
-            TokenType::OpAssign         => "=",
-            TokenType::OpEqual          => "==",
-            TokenType::OpNotEqual       => "!=",
-            TokenType::OpGreaterThan    => ">",
-            TokenType::OpLessThan       => "<",
-            TokenType::OpGreaterEqual   => ">=",
-            TokenType::OpLessEqual      => "<=",
-            TokenType::OpLogicalOr      => "||",
-            TokenType::OpLogicalAnd     => "&&",
-            TokenType::OpDereference    => "@",
-            TokenType::KeywordReturn    => "return",
-            TokenType::KeywordIf        => "if",
-            TokenType::KeywordElse      => "else",
-            TokenType::KeywordFor       => "for",
-            TokenType::KeywordBreak     => "break",
-            TokenType::KeywordContinue  => "continue",
-            TokenType::KeywordWhile     => "while",
-            TokenType::TypeInt64        => "i64",
-            TokenType::TypeInt64Ptr     => "i64^",
-            TokenType::End              => ";",
-            TokenType::Separator        => ",",
-            TokenType::OpenParen        => "(",
-            TokenType::CloseParen       => ")",
-            TokenType::OpenScope        => "{",
-            TokenType::CloseScope       => "}",
-            TokenType::Identifier       => "identifier",
-            TokenType::Int              => "literal int",
-            TokenType::Pointer          => "literal pointer",
+            TokenType::None              => "",
+            TokenType::OpPlus            => "+",
+            TokenType::OpMinus           => "-",
+            TokenType::OpMul             => "*",
+            TokenType::OpDiv             => "/",
+            TokenType::OpAssign          => "=",
+            TokenType::OpEqual           => "==",
+            TokenType::OpNotEqual        => "!=",
+            TokenType::OpGreaterThan     => ">",
+            TokenType::OpLessThan        => "<",
+            TokenType::OpGreaterEqual    => ">=",
+            TokenType::OpLessEqual       => "<=",
+            TokenType::OpLogicalOr       => "||",
+            TokenType::OpLogicalAnd      => "&&",
+            TokenType::OpDereference     => "@",
+            TokenType::OpSubscript       => "[",
+            TokenType::KeywordReturn     => "return",
+            TokenType::KeywordIf         => "if",
+            TokenType::KeywordElse       => "else",
+            TokenType::KeywordFor        => "for",
+            TokenType::KeywordBreak      => "break",
+            TokenType::KeywordContinue   => "continue",
+            TokenType::KeywordWhile      => "while",
+            TokenType::TypeInt64         => "i64",
+            TokenType::TypeInt64Ptr      => "i64^",
+            TokenType::TypeChr           => "chr",
+            TokenType::TypeChrPtr        => "chr^",
+            TokenType::TypeAnyPtr        => "any^",
+            TokenType::Int               => "literal int",
+            TokenType::String            => "literal string",
+            TokenType::Char              => "literal char",
+            TokenType::Syscall           => "syscall",
+            TokenType::End               => ";",
+            TokenType::Separator         => ",",
+            TokenType::OpenParen         => "(",
+            TokenType::CloseParen        => ")",
+            TokenType::OpenSquare        => "[",
+            TokenType::CloseSquare       => "]",
+            TokenType::OpenScope         => "{",
+            TokenType::CloseScope        => "}",
+            TokenType::Identifier        => "identifier",
         }
     }
 }
@@ -185,6 +201,23 @@ impl Lexer {
         tok.clone()
     }
 
+    pub fn expect_type(&mut self) -> Token {
+        const KINDS: [TokenType; 5] = [
+            TokenType::TypeInt64,
+            TokenType::TypeInt64Ptr,
+            TokenType::TypeChr,
+            TokenType::TypeChrPtr,
+            TokenType::TypeAnyPtr,
+        ];
+
+        let tok = self.consume_token();
+        if KINDS.contains(&tok.kind) {
+            return tok;
+        }
+
+        panic!("{} Error: Expected type but got `{}`",  tok.pos, tok.val_str());
+    }
+
     pub fn expect_tokens(&mut self, kinds: Vec<TokenType>) -> Token {
         let tok = self.consume_token();
         if kinds.contains(&tok.kind) {
@@ -213,6 +246,19 @@ impl Lexer {
             let tok = self.toks.get(i).expect("Error: Lexer failed to dump next token");
             eprintln!("{}", tok.val_str());
         }
+    }
+
+    pub fn vec_val(v: &Vec<u8>) -> i64 {
+        assert!(!v.is_empty(), "Cannot convert empty vector to int");
+        let base: i64 = 10;
+        let mut mul: i64 = base.pow((v.len() - 1) as u32);
+        let mut res: i64 = 0;
+        for c in v {
+            let digit: u8 = *c - b'0';
+            res += digit as i64 * mul;
+            mul /= 10;
+        }
+        res
     }
 
     pub fn tokenize(&mut self) {
@@ -249,7 +295,76 @@ impl Lexer {
 
                     lexeme.push(self.rune);
                 },
-                b'@' | b';' | b'+' | b'-' | b'*' | b'(' | b')' | b'{' | b'}' => {
+                b'\'' => {
+                    if !lexeme.is_empty() {
+                        self.toks.push(Token {
+                            kind: TokenType::None,
+                            val: lexeme.clone(),
+                            pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() },
+                        });
+                        lexeme.clear();
+                    }
+
+                    lexeme.push(self.rune);
+                    self.advance_char();
+                    if self.rune == b'\\' {
+                        self.advance_char();
+                        match self.rune {
+                            b'\\' => lexeme.push(b'\\'),
+                            b'n'  => lexeme.push(b'\n'),
+                            b'r'  => lexeme.push(b'\r'),
+                            b'\"' => lexeme.push(b'\"'),
+                            b'\'' => lexeme.push(b'\''),
+                            b'0' => lexeme.push(b'\0'),
+                            _ => panic!("{} Error: Invalid escape `\\{}`", self.pos, self.rune)
+                        }
+                    } else {
+                        lexeme.push(self.rune);
+                    }
+
+                    self.advance_char();
+                    lexeme.push(self.rune);
+                    self.toks.push(Token {
+                        kind: TokenType::None,
+                        val: lexeme.clone(),
+                        pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() },
+                    });
+                    lexeme.clear();
+                },
+                b'\"' => {
+                    if !lexeme.is_empty() {
+                        self.toks.push(Token {
+                            kind: TokenType::None,
+                            val: lexeme.clone(),
+                            pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() },
+                        });
+                        lexeme.clear();
+                    }
+
+                    lexeme.push(self.rune);
+                    while self.advance_char() {
+                        if self.rune == b'\\' {
+                            self.advance_char();
+                            match self.rune {
+                                b'\\' => lexeme.push(b'\\'),
+                                b'n'  => lexeme.push(b'\n'),
+                                b'r'  => lexeme.push(b'\r'),
+                                b'\"' => lexeme.push(b'\"'),
+                                b'\'' => lexeme.push(b'\''),
+                                b'\0' => lexeme.push(b'\0'),
+                                _ => panic!("{} Error: Invalid escape `\\{}`", self.pos, self.rune)
+                            }
+
+                            continue;
+                        }
+
+                        lexeme.push(self.rune);
+                        if self.rune == b'\"' {
+                            break;
+                        }
+                    }
+                },
+                b'@' | b';' | b'+' | b'-' | b'*' | b'(' | b')' | b'{' | b'}' | b'[' | b']' => {
                     if !lexeme.is_empty() {
                         self.toks.push(Token {
                             kind: TokenType::None,
@@ -386,6 +501,8 @@ impl Lexer {
                     b'@' => tok.kind = TokenType::OpDereference,
                     b'(' => tok.kind = TokenType::OpenParen,
                     b')' => tok.kind = TokenType::CloseParen,
+                    b'[' => tok.kind = TokenType::OpenSquare,
+                    b']' => tok.kind = TokenType::CloseSquare,
                     b'{' => tok.kind = TokenType::OpenScope,
                     b'}' => tok.kind = TokenType::CloseScope,
                     b';' => tok.kind = TokenType::End,
@@ -414,18 +531,32 @@ impl Lexer {
                     // Types
                     "i64"      => tok.kind = TokenType::TypeInt64,
                     "i64^"     => tok.kind = TokenType::TypeInt64Ptr,
+                    "chr"      => tok.kind = TokenType::TypeChr,
+                    "chr^"     => tok.kind = TokenType::TypeChrPtr,
+                    "any^"     => tok.kind = TokenType::TypeAnyPtr,
+                    // Intrinsics
+                    "syscall" => tok.kind = TokenType::Syscall,
                     _ => { // Then match variable contents of words
-                        if tok.val.iter().rev().skip(1).rev().all(|c| c.is_ascii_digit()) {
-                            let last: &u8 = tok.val.last().unwrap();
-                            match last {
-                                b'0'..=b'9' => tok.kind = TokenType::Int,
-                                b'p' => tok.kind = TokenType::Pointer,
-                                _ => panic!("{} Error: Invalid token `{}` in numeric literal", tok.pos, last)
-                            }
+                        if tok.val.iter().all(|c| c.is_ascii_digit()) {
+                            tok.kind = TokenType::Int;
+                        } else if *first == b'\'' {
+                            tok.kind = TokenType::Char;
+                            // Strip off speech marks
+                            tok.val.pop();
+                            tok.val.remove(0);
+                        } else if *first == b'\"' {
+                            tok.kind = TokenType::String;
+                            // Strip off speech marks
+                            tok.val.pop();
+                            tok.val.remove(0);
+                            // Add null terminator
+                            tok.val.push(b'\0');
                         } else if first.is_ascii_alphabetic() {
                             for c in &tok.val {
-                                if matches!(c, b'"' | b'$' | b'%' | b'^' | b'&' | b'~' | b'#' | b'\\' | b',' | b'.' | b'`'| b'!') {
-                                    panic!("{} Error: Invalid token `{}` in identifier", tok.pos, String::from_utf8(vec![*c]).expect("Error: Failed to convert char to str"));
+                                if matches!(c, b'"' | b'$' | b'%' | b'^' | b'&' | b'~' | b'#' | 
+                                               b'\\' | b',' | b'.' | b'`'| b'!') {
+                                    panic!("{} Error: Invalid token `{}` in identifier", 
+                                           tok.pos, String::from_utf8(vec![*c]).expect("Error: Failed to convert char to str"));
                                 }
                             }
                             tok.kind = TokenType::Identifier;

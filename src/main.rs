@@ -71,7 +71,7 @@ impl Compiler {
         if !self.flags.contains(&Flag::Unsafe) {
             self.info("Performing Static Type Analysis");
             let mut analyser: Analyser = Analyser::new();
-            analyser.typecheck_ast(&ast);
+            analyser.typecheck_ast(&mut ast);
         } else {
             self.info("Skipping Static Type Analysis");
         }

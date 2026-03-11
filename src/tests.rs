@@ -55,3 +55,7 @@ fn test_scope_break() { run_test("scope_break"); }
 fn test_nest() { run_test("nest"); }
 #[test]
 fn test_memory() { run_test("memory"); }
+#[test]
+fn test_index() { run_test("index"); }
+#[test]
+fn test_string() { run_test("string"); }

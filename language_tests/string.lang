@@ -1,0 +1,41 @@
+i64 main() {
+    dump(strlen("Hello, World!\n"));
+
+    dump(strlen("Hello, World!\n"));
+
+    any^ str = "Hello, World!\n";
+    syscall(1, 1, str, 14);
+
+    syscall(1, 1, "Hello, World!\n", 14);
+
+    dump(strlen("Hello, World!\n"));
+    puts("Hello, World!\n");
+
+    chr^ a = mmap(4096);
+    a[0] = 'a';
+    a[1] = '\n';
+    puts(a);
+    munmap(a, 4096);
+
+    puts("hello\n");
+
+    exit(0);
+}
+
+i64 strlen(chr^ str) {
+    chr c = @str;
+    i64 i = 1;
+    while c != '\0' {
+        c = str[i];
+        i = i + 1;
+    }
+    return i - 1;
+}
+
+i64 puts(chr^ str) {
+    i64 len = strlen(str);
+    syscall(1, 1, str, len);
+    dump(len);
+
+    return 0;
+}
