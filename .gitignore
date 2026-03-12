@@ -3,3 +3,5 @@ rust-analyzer/
 debug/
 **/.rs.bk
 output
+output.asm
+output.o
