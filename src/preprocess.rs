@@ -17,7 +17,8 @@ impl Processor {
         }
     }
 
-    pub fn resolve_includes(&mut self, lexer: &mut Lexer, include_paths: Vec<String>) {
+    pub fn resolve_includes(&mut self, lexer: &mut Lexer, include_paths: Vec<String>) -> bool {
+        let mut resolved: bool = false;
         while lexer.has_token() {
             let tok: Token = lexer.consume_token();
             if tok.kind == TokenType::KeywordInclude {
@@ -43,15 +44,21 @@ impl Processor {
                     lexer.toks.remove(lexer.cur);
 
                     // Tokenize file
-                    let mut tmp: Lexer = Lexer::new(file_src, &file.val_str());
-                    tmp.tokenize();
-                    tmp.lex();
+                    let mut l: Lexer = Lexer::new(file_src, &file.val_str());
+                    l.tokenize();
+                    l.lex();
+                    let mut p: Processor = Processor::new();
+                    let mut subresolved: bool = false;
+                    while !subresolved {
+                        subresolved = !p.resolve_includes(&mut l, include_paths.clone());
+                    }
 
                     // Copy in contents of included file
-                    for tok in tmp.toks {
+                    for tok in l.toks {
                         lexer.toks.insert(lexer.cur, tok);
                         lexer.cur += 1;
                     }
+                    resolved = true;
                 } else {
                     panic!("{} Error: Unable to resolve include. Could not find file `{}`", file.pos, file.val_str());
                 }
@@ -59,6 +66,7 @@ impl Processor {
         }
 
         lexer.refresh();
+        resolved
     }
 }
 

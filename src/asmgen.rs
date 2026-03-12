@@ -15,66 +15,6 @@ pub mod nasm_x86_64 {
 
         for instr in &ir.instrs {
             match instr.kind {
-                InstructionType::DefineIntrinsicDump => {
-                    writeln!(f, "; --- Debug Dump ---")?;
-                    writeln!(f, "func_dump:")?;
-                    writeln!(f, "    sub rsp, 40")?;
-                    writeln!(f, "    lea rsi, [rsp + 31]")?;
-                    writeln!(f, "    mov byte [rsp + 31], 10")?;
-                    writeln!(f, "    mov ecx, 1")?;
-                    writeln!(f, "    mov r8, -3689348814741910323")?;
-                    writeln!(f, ".LBB0_1:")?;
-                    writeln!(f, "    mov rax, rdi")?;
-                    writeln!(f, "    mul r8")?;
-                    writeln!(f, "    shr rdx, 3")?;
-                    writeln!(f, "    lea eax, [rdx + rdx]")?;
-                    writeln!(f, "    lea eax, [rax + 4*rax]")?;
-                    writeln!(f, "    mov r9d, edi")?;
-                    writeln!(f, "    sub r9d, eax")?;
-                    writeln!(f, "    or r9b, 48")?;
-                    writeln!(f, "    mov byte [rsi - 1], r9b")?;
-                    writeln!(f, "    dec rsi")?;
-                    writeln!(f, "    inc rcx")?;
-                    writeln!(f, "    cmp rdi, 9")?;
-                    writeln!(f, "    mov rdi, rdx")?;
-                    writeln!(f, "    ja .LBB0_1")?;
-                    writeln!(f, "    mov edi, 1")?;
-                    writeln!(f, "    mov rdx, rcx")?;
-                    writeln!(f, "    mov rax, 1")?;
-                    writeln!(f, "    syscall")?;
-                    writeln!(f, "    add rsp, 40")?;
-                    writeln!(f, "    ret")?;
-                },
-                InstructionType::DefineIntrinsicExit => {
-                    writeln!(f, "; --- Exit ---")?;
-                    writeln!(f, "func_exit:")?;
-                    writeln!(f, "    mov rax, 60")?;
-                    writeln!(f, "    syscall")?;
-                },
-                InstructionType::DefineIntrinsicMMap => {
-                    writeln!(f, "; --- MMap ---")?;
-                    writeln!(f, "func_mmap:")?;
-                    writeln!(f, "    push rbp")?;
-                    writeln!(f, "    mov rbp, rsp")?;
-                    writeln!(f, "    mov rax, 9")?; 
-                    writeln!(f, "    mov rsi, rdi")?; 
-                    writeln!(f, "    xor rdi, rdi")?; 
-                    writeln!(f, "    mov rdx, 3")?; 
-                    writeln!(f, "    mov r10, 34")?; 
-                    writeln!(f, "    mov r8, -1")?; 
-                    writeln!(f, "    xor r9, r9")?;
-                    writeln!(f, "    syscall")?; 
-                    writeln!(f, "    mov rsp, rbp")?;
-                    writeln!(f, "    pop rbp")?;
-                    writeln!(f, "    ret")?;
-                },
-                InstructionType::DefineIntrinsicMUnmap => {
-                    writeln!(f, "; --- MUnmap ---")?;
-                    writeln!(f, "func_munmap:")?;
-                    writeln!(f, "    mov rax, 11")?;
-                    writeln!(f, "    syscall")?;
-                    writeln!(f, "    ret")?;
-                },
                 InstructionType::StartDataSegment => {
                     writeln!(f, "segment .data")?;
                 },

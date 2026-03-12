@@ -78,20 +78,28 @@ impl DataType {
 
     pub fn is_assignable(&self, other: &DataType) -> bool {
         match self {
-            DataType::I64    => matches!(other, DataType::I64),
+            DataType::I64    => matches!(other, DataType::I64 | DataType::Chr),
             DataType::I64Ptr => matches!(other, DataType::I64Ptr | DataType::AnyPtr),
-            DataType::Chr    => matches!(other, DataType::Chr),
+            DataType::Chr    => matches!(other, DataType::Chr | DataType::I64),
             DataType::ChrPtr => matches!(other, DataType::ChrPtr | DataType::AnyPtr),
             DataType::AnyPtr => matches!(other, DataType::ChrPtr | DataType::I64Ptr | DataType::AnyPtr),
             _ => false
         }
     }
 
+    pub fn is_ptr(&self) -> bool {
+        matches!(self, DataType::I64Ptr | DataType::ChrPtr | DataType::AnyPtr)
+    }
+
+    pub fn is_int(&self) -> bool {
+        matches!(self, DataType::I64)
+    }
+
     pub fn is_compatible(&self, other: &DataType) -> bool {
         match self {
-            DataType::I64    => matches!(other, DataType::AnyPtr | DataType::I64),
+            DataType::I64    => matches!(other, DataType::AnyPtr | DataType::I64 | DataType::Chr),
             DataType::I64Ptr => matches!(other, DataType::AnyPtr | DataType::I64Ptr | DataType::I64),
-            DataType::Chr    => matches!(other, DataType::Chr),
+            DataType::Chr    => matches!(other, DataType::Chr | DataType::I64),
             DataType::ChrPtr => matches!(other, DataType::AnyPtr | DataType::ChrPtr | DataType::I64),
             DataType::AnyPtr => matches!(other, DataType::AnyPtr | DataType::ChrPtr | DataType::I64Ptr | DataType::I64),
             DataType::Void   => matches!(other, DataType::Void),
@@ -417,42 +425,6 @@ impl <'a> ParseTree<'a> {
     // they were regular functions, this lets the type checker pass.
     pub fn construct(&mut self, lexer: &mut Lexer) {
         let mut children: Vec<ParseNode> = Vec::new();
-        let exit = ParseNode::_func_decl(DataType::Void, 
-                                         Token { 
-                                             kind: TokenType::Identifier, 
-                                             val: Vec::from(b"exit"),
-                                             pos: Pos { row: u32::MAX, col: u32::MAX, file: String::from("Hardcoded") } 
-                                         },
-                                         vec![ParseNode::_var_decl(DataType::I64, Token::null())], 
-                                         vec![]);
-        let dump = ParseNode::_func_decl(DataType::Void, 
-                                         Token { 
-                                             kind: TokenType::Identifier, 
-                                             val: Vec::from(b"dump"),
-                                             pos: Pos { row: u32::MAX, col: u32::MAX, file: String::from("Hardcoded") } 
-                                         },
-                                         vec![ParseNode::_var_decl(DataType::I64, Token::null())], 
-                                         vec![]);
-        let mmap = ParseNode::_func_decl(DataType::AnyPtr, 
-                                         Token { 
-                                             kind: TokenType::Identifier, 
-                                             val: Vec::from(b"mmap"),
-                                             pos: Pos { row: u32::MAX, col: u32::MAX, file: String::from("Hardcoded") } 
-                                         },
-                                         vec![ParseNode::_var_decl(DataType::I64, Token::null())], 
-                                         vec![]);
-        let munmap = ParseNode::_func_decl(DataType::I64, 
-                                           Token { 
-                                               kind: TokenType::Identifier, 
-                                               val: Vec::from(b"munmap"),
-                                               pos: Pos { row: u32::MAX, col: u32::MAX, file: String::from("Hardcoded") } 
-                                           },
-                                           vec![ParseNode::_var_decl(DataType::AnyPtr, Token::null()),
-                                                ParseNode::_var_decl(DataType::I64, Token::null())], 
-                                           vec![]);
-
-        children.append(&mut vec![dump, exit, mmap, munmap]);
-
         while lexer.has_token() {
             let tok: Token = lexer.peek_token();
             match tok.kind {
@@ -719,7 +691,12 @@ impl <'a> ParseTree<'a> {
 
                 let mut decl: Option<ParseNode> = None;
                 let mut init: Option<ParseNode> = None;
-                if matches!(lexer.peek_token().kind, TokenType::TypeVoid | TokenType::TypeInt64Ptr | TokenType::TypeInt64 | TokenType::TypeChrPtr | TokenType::TypeChr | TokenType::TypeAnyPtr) {
+                if matches!(lexer.peek_token().kind, TokenType::TypeVoid
+                                                     | TokenType::TypeInt64Ptr
+                                                     | TokenType::TypeInt64
+                                                     | TokenType::TypeChrPtr
+                                                     | TokenType::TypeChr
+                                                     | TokenType::TypeAnyPtr) {
                     let (d, i) = self.parse_var_decl(lexer);
                     decl = Some(d);
                     init = Some(i);

@@ -1,3 +1,5 @@
+include "std.lang"
+
 i64 main() {
     test_one();
     test_two();
@@ -5,7 +7,7 @@ i64 main() {
 }
 
 i64 test_one() {
-    i64^ mem = mmap(4096);
+    i64^ mem = malloc(4096);
 
     @mem = 10;
 
@@ -19,26 +21,26 @@ i64 test_one() {
     @mem = 40;
 
     mem = mem - 24;
-    dump(@mem);
-    dump(@(mem + 8));
-    dump(@(mem + 16));
-    dump(@(mem + 24));
+    putd(@mem);
+    putd(@(mem + 8));
+    putd(@(mem + 16));
+    putd(@(mem + 24));
 
     munmap(mem, 4096);
 }
 
 i64 test_two() {
-    i64^ mem = mmap(4096);
+    i64^ mem = malloc(4096);
 
-    dump(1);
+    putd(1);
     @(mem) = 100;
-    dump(2);
+    putd(2);
     @(mem + 8) = 200;
-    dump(3);
-    dump(@mem);
-    dump(4);
-    dump(@(mem + 8));
-    dump(5);
+    putd(3);
+    putd(@mem);
+    putd(4);
+    putd(@(mem + 8));
+    putd(5);
 
     munmap(mem, 4096);
 }

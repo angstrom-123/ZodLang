@@ -7,6 +7,6 @@ i64 fib(i64 n) {
 }
 
 i64 main() {
-    dump(fib(1 + 2 + 3 +4)); // 55
+    putd(fib(1 + 2 + 3 +4)); // 55
     exit(0);
 }

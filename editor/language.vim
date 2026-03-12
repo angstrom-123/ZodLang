@@ -18,7 +18,7 @@ set iskeyword=a-z,A-Z,_,48-57,94
 syntax keyword langTodos TODO BUG NOTE
 
 " Types
-syntax keyword langTypes void i64 i64^ chr chr^ any^
+syntax keyword langTypes void u64 i64 i64^ chr chr^ any^
 
 " Language Keywords 
 syntax keyword langKeywords if if* else continue break for return while syscall include

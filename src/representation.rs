@@ -27,16 +27,7 @@ const USER_REG_ORDER: [Register; 6] = [
 #[derive(Debug)]
 #[derive(PartialEq)]
 pub enum InstructionType {
-    // Temporary,
-    // Until i have an stdlib, these functions are hardcoded in asm, and are 
-    // embedded in the binary be default. Instructions tell asmgen to define them.
-    DefineIntrinsicDump,
-    DefineIntrinsicExit,
-    DefineIntrinsicMMap,
-    DefineIntrinsicMUnmap,
-
     Comment,
-
     StartDataSegment,
 
     PushStackLiteralString,        // Pushes the adress of a literal string onto the stack
@@ -244,38 +235,6 @@ pub struct Instruction {
 impl Instruction {
     pub fn dump(&self) {
         eprintln!("{:?}\n    a: {}\n    b: {}", self.kind, self.opera, self.operb);
-    }
-
-    fn _define_intrinsic_munmap() -> Self {
-        Instruction {
-            kind: InstructionType::DefineIntrinsicMUnmap,
-            opera: Operand::None,
-            operb: Operand::None,
-        }
-    }
-
-    fn _define_intrinsic_dump() -> Self {
-        Instruction {
-            kind: InstructionType::DefineIntrinsicDump,
-            opera: Operand::None,
-            operb: Operand::None,
-        }
-    }
-
-    fn _define_intrinsic_exit() -> Self {
-        Instruction {
-            kind: InstructionType::DefineIntrinsicExit,
-            opera: Operand::None,
-            operb: Operand::None,
-        }
-    }
-
-    fn _define_intrinsic_mmap() -> Self {
-        Instruction {
-            kind: InstructionType::DefineIntrinsicMMap,
-            opera: Operand::None,
-            operb: Operand::None,
-        }
     }
 
     fn _comment(comment: &'static str) -> Self {
@@ -547,7 +506,7 @@ impl Instruction {
         Instruction {
             kind: InstructionType::CopyRegisterAToAdrAtRegisterB,
             opera: Operand::Register { name: a, size },
-            operb: Operand::Register { name: b, size },
+            operb: Operand::Register { name: b, size: 8 },
         }
     }
 }
@@ -664,21 +623,7 @@ impl IR {
     }
 
     pub fn generate_from_ast(&mut self, ast: &ParseTree) {
-        // Function like intrinsics are hard coded in asm right now
-        self.record_label(&mut Label::new("func_dump"));
-        self.instrs.push(Instruction::_define_intrinsic_dump());
-
-        self.record_label(&mut Label::new("func_exit"));
-        self.instrs.push(Instruction::_define_intrinsic_exit());
-
-        self.record_label(&mut Label::new("func_mmap"));
-        self.instrs.push(Instruction::_define_intrinsic_mmap());
-
-        self.record_label(&mut Label::new("func_munmap"));
-        self.instrs.push(Instruction::_define_intrinsic_munmap());
-
-        // NOTE: Skipping the first 4 declarations, because those are the hardcoded intrinsice
-        for stmt in ast.root.children.iter().skip(4) {
+        for stmt in ast.root.children.iter() {
             match stmt.kind {
                 NodeType::FuncDecl => {
                     self.instrs.push(Instruction::_comment("Function Declaration"));
@@ -853,7 +798,7 @@ impl IR {
                                 self.instrs.append(&mut vec![
                                     Instruction::_pop_stack(Register::RAX),
                                     Instruction::_copy_var_val_to_register(Register::RBX, var.clone(), var.typ.size()), // address into rbx
-                                    Instruction::_copy_register_a_to_adr_at_register_b(Register::RAX, Register::RBX, 8),
+                                    Instruction::_copy_register_a_to_adr_at_register_b(Register::RAX, Register::RBX, var.typ.size()),
                                 ]);
                             } else {
                                 panic!("{} Error: Attempting to assign undeclared variable `{}`", stmt.tok.pos, lhs.tok.val_str());
@@ -865,7 +810,7 @@ impl IR {
                             self.instrs.append(&mut vec![
                                 Instruction::_pop_stack(Register::RBX), // lhs
                                 Instruction::_pop_stack(Register::RAX), // rhs
-                                Instruction::_copy_register_a_to_adr_at_register_b(Register::RAX, Register::RBX, 8),
+                                Instruction::_copy_register_a_to_adr_at_register_b(Register::RAX, Register::RBX, lhs.datatype.size()),
                             ]);
                         }
                     } else if lhs_group.kind == NodeType::Var {
@@ -880,7 +825,10 @@ impl IR {
                     } else if lhs_group.kind == NodeType::BinaryOp && lhs_group.tok.kind == TokenType::OpSubscript {
                         let lhs: &ParseNode = lhs_group.children.first().unwrap();
                         let rhs: &ParseNode = lhs_group.children.last().unwrap();
-                        self.generate_from_node(rhs, ctx);
+                        // self.generate_from_node(rhs, ctx);
+                        for node in &rhs.post_order() {
+                            self.generate_from_node(node, ctx);
+                        }
                         if let Some(var) = ctx.locals.get(&lhs.tok.val) {
                             let size: i64 = var.typ.base_type().unwrap().size();
                             self.instrs.append(&mut vec![
@@ -890,7 +838,7 @@ impl IR {
                                 Instruction::_mul_register_a_by_b(Register::RBX, Register::RCX, 8), // offset
                                 Instruction::_copy_var_val_to_register(Register::RDX, var.clone(), 8), // address into rcx
                                 Instruction::_add_register_b_to_a(Register::RDX, Register::RBX, 8), // add offset to addy
-                                Instruction::_copy_register_a_to_adr_at_register_b(Register::RAX, Register::RDX, 8), // assign
+                                Instruction::_copy_register_a_to_adr_at_register_b(Register::RAX, Register::RDX, size), // assign
                             ]);
                         } else {
                             panic!("{} Error: Attempting to assign undeclared variable `{}`", stmt.tok.pos, lhs.tok.val_str());
@@ -1261,8 +1209,6 @@ impl IR {
                         } else {
                             panic!("{} Error: Attempting to assign undeclared variable `{}`", lhs.tok.pos, lhs.tok.val_str());
                         }
-                        // TODO
-
                         self.instrs.append(&mut vec![
                             Instruction::_comment("BinOp Subscript"),
                             Instruction::_pop_stack(Register::RBX), // index

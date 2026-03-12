@@ -380,7 +380,7 @@ impl Lexer {
                         }
                     }
                 },
-                b'@' | b';' | b'+' | b'-' | b'*' | b'(' | b')' | b'{' | b'}' | b'[' | b']' => {
+                b'@' | b';' | b'+' | b'*' | b'(' | b')' | b'{' | b'}' | b'[' | b']' => {
                     if !lexeme.is_empty() {
                         self.toks.push(Token {
                             kind: TokenType::None,
@@ -398,7 +398,7 @@ impl Lexer {
                     });
                     lexeme.clear();
                 },
-                b'>' | b'<' | b'!' => {
+                b'>' | b'<' | b'!' | b'-' => {
                     if !lexeme.is_empty() {
                         self.toks.push(Token {
                             kind: TokenType::None,
@@ -555,7 +555,8 @@ impl Lexer {
                     // Intrinsics
                     "syscall" => tok.kind = TokenType::Syscall,
                     _ => { // Then match variable contents of words
-                        if tok.val.iter().all(|c| c.is_ascii_digit()) {
+                        // Allow for negative literals
+                        if tok.val.iter().skip(1).all(|c| c.is_ascii_digit()) && (first.is_ascii_digit() || *first == b'-') {
                             tok.kind = TokenType::Int;
                         } else if *first == b'\'' {
                             tok.kind = TokenType::Char;

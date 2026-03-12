@@ -1,3 +1,5 @@
+include "std.lang"
+
 i64 add_with_10(i64 a, i64 b) {
     i64 c = 10;
     return a + b + c;
@@ -8,10 +10,10 @@ i64 no_args() {
 }
 
 i64 main() {
-    dump(add_with_10(2, 3));
-    dump(add_with_10(5, 6));
+    putd(add_with_10(2, 3));
+    putd(add_with_10(5, 6));
     i64 a = add_with_10(1 + 2 * 3, 6 / 2);
-    dump(a);
-    dump(add_with_10(no_args(), no_args()));
+    putd(a);
+    putd(add_with_10(no_args(), no_args()));
     exit(0);
 }

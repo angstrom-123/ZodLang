@@ -1,36 +1,38 @@
+include "std.lang"
+
 i64 main() {
     for i64 i = 0; i < 5; i = i + 1 {
-        dump(i);
+        putd(i);
     }
 
     for i64 i = 0; i < 5; i = i + 1 {
-        dump(i);
+        putd(i);
     }
 
     for i64 i = 0; i < 5; {
-        dump(i);
+        putd(i);
         i = i + 1;
     }
 
     for i64 i = 4; 
             i >= 0; 
             i = i - 1 {
-        dump(i);
+        putd(i);
     }
 
     i64 i;
     for ; i < 5; i = i + 1 {
-        dump(i);
+        putd(i);
     }
 
     i = 0;
     for ; i < 5; {
-        dump(i);
+        putd(i);
         i = i + 1;
     }
 
     for i64 j = 0; j < 10; j = j + 1 {
-        dump(j);
+        putd(j);
         if j >= 5 {
             break;
         }
@@ -41,7 +43,7 @@ i64 main() {
             continue;
         }
 
-        dump(j);
+        putd(j);
     }
 
     i = 0;
@@ -49,23 +51,23 @@ i64 main() {
         if i == 2 || i == 4 || i == 6 || i == 8 {
             continue;
         }
-        dump(i);
+        putd(i);
     }
-    dump(i);
+    putd(i);
 
     i = 0;
     for ; i < 10; {
         if i == 4 {
             break;
         }
-        dump(i);
+        putd(i);
         i = i + 1;
     }
-    dump(i);
+    putd(i);
 
     i = 0;
     while i < 10 {
-        dump(i);
+        putd(i);
         i = i + 1;
     }
 
@@ -80,7 +82,7 @@ i64 main() {
             break;
         }
 
-        dump(ctr);
+        putd(ctr);
     }
 
     exit(0);

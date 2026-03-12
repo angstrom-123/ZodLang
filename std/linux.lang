@@ -1,0 +1,86 @@
+i64 read(i64 fd, chr^ buf, i64 cnt) { return syscall(0, fd, buf, cnt); }
+i64 write(i64 fd, chr^ buf, i64 cnt) { return syscall(1, fd, buf, cnt); }
+i64 open(chr^ filename, i64 flags, i64 mode) { return syscall(2, filename, flags, mode); }
+i64 close(i64 fd) { return syscall(3, fd); }
+// fstat
+// lstat
+// poll
+i64 lseek(i64 fd, i64 offset, i64 whence) { return syscall(8, fd, offset, whence); }
+any^ mmap(any^ addr, i64 len, i64 prot, i64 flags, i64 fd, i64 offset) { return syscall(9, addr, len, prot, flags, fd, offset); }
+i64 mprotect(any^ start, i64 len, i64 prot) { return syscall(10, start, len, prot); }
+i64 munmap(any^ addr, i64 len) { return syscall(11, addr, len); }
+any^ brk(any^ brk) { return syscall(12, brk); }
+// rt_sigaction
+// rt_sigprocmask
+// rt sigreturn
+i64 ioctl(i64 fd, i64 cmd, i64 arg) { return syscall(16, fd, cmd, arg); }
+i64 pread64(i64 fd, chr^ buf, i64 cnt, i64 pos) { return syscall(17, fd, buf, cnt, pos); }
+i64 pwrite64(i64 fd, chr^ buf, i64 cnt, i64 pos) { return syscall(18, fd, buf, cnt, pos); }
+// readv
+// writev
+i64 access(chr^ filename, i64 mode) { return syscall(21, filename, mode); }
+i64 pipe(i64^ fildes) { return syscall(22, fildes); }
+// select 
+// sched_yield
+any^ mremap(any^ addr, i64 old_len, i64 new_len, i64 flags, any^ new_addr) { return syscall(25, addr, old_len, new_len, flags, new_addr); }
+i64 msync(any^ start, i64 len, i64 flags) { return syscall(26, start, len, flags); }
+// mincore
+i64 madvise(any^ start, i64 len, i64 behaviour) { return syscall(28, start, len, behaviour); }
+i64 shmget(i64 key, i64 size, i64 flag) { return syscall(29, key, size, flag); }
+i64 shmat(i64 shmid, chr^ shmaddr, i64 shmflg) { return syscall(30, shmid, shmaddr, shmflg); }
+// shmctl
+i64 dup(i64 fildes) { return syscall(32, fildes); }
+i64 dup2(i64 oldfd, i64 newfd) { return syscall(33, oldfd, newfd); }
+i64 pause() { return syscall(34); }
+// nanosleep
+// getitimer
+i64 alarm(i64 seconds) { return syscall(37, seconds); }
+// setitimer
+i64 getpid() { return syscall(39); }
+i64 sendfile(i64 out_fd, i64 in_fd, i64^ offset, i64 count) { return syscall(40, out_fd, in_fd, offset, count); }
+i64 socket(i64 a, i64 b, i64 c) { return syscall(41, a, b, c); }
+// connect
+// accept 
+// sendto
+// recvfrom
+// sendmsg
+// recvmsg
+i64 shutdown(i64 a, i64 b) { return syscall(48, a, b); }
+// bind
+i64 listen(i64 a, i64 b) { return syscall(50, a, b); }
+// getsockname
+// getpeername
+i64 socketpair(i64 a, i64 b, i64 c, i64^ d) { return syscall(53, a, b, c, d); }
+i64 setsockopt(i64 fd, i64 level, i64 optname, chr^ optval, i64 optlen) { return syscall(54, fd, level, optname, optval, optlen); }
+i64 getsockopt(i64 fd, i64 level, i64 optname, chr^ optval, i64^ optlen) { return syscall(55, fd, level, optname, optval, optlen); }
+i64 clone(i64 a, i64 b, i64^ c, i64^ d, i64 e) { return syscall(56, a, b, c, d, e); }
+i64 fork() { return syscall(57); }
+i64 vfork() { return syscall(58); }
+// execve
+i64 exit(i64 error_code) { return syscall(60, error_code); }
+// wait4
+i64 kill(i64 pid, i64 sig) { return syscall(62, pid, sig); }
+// uname
+i64 semget(i64 key, i64 nsems, i64 semflg) { return syscall(64, key, nsems, semflg); }
+// semop
+i64 semctl(i64 semid, i64 semnum, i64 cmd, i64 arg) { return syscall(66, semid, semnum, cmd, arg); }
+i64 shmdt(chr^ shmaddr) { return syscall(67, shmaddr); }
+i64 msgget(i64 key, i64 msgflg) { return syscall(68, key, msgflg); }
+// msgsnd
+// msgrcv
+// msgctl
+// fcntl 
+// flock
+// fsync
+// fdatasync
+// truncate
+// ftruncate
+// getdents
+i64 getcwd(chr^ buf, i64 size) { return syscall(79, buf, size); }
+i64 chdir(chr^ filename) { return syscall(80, filename); }
+i64 fchdir(i64 fd) { return syscall(81, fd); }
+i64 rename(chr^ oldname, chr^ newname) { return syscall(82, oldname, newname); }
+i64 mkdir(chr^ pathname, i64 mode) { return syscall(83, pathname, mode); }
+i64 rmdir(chr^ pathname) { return syscall(84, pathname); }
+i64 creat(chr^ pathname, i64 mode) { return syscall(85, pathname, mode); }
+// ...

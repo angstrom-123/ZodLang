@@ -1,18 +1,20 @@
+include "std.lang"
+
 i64 main() {
     i64 a = 10;
-    dump(a);
+    putd(a);
 
     i64 b = a*a + 2;
-    dump(b);
+    putd(b);
 
     i64 c = 2 + a + b;
-    dump(c);
+    putd(c);
 
-    dump(a + b);
+    putd(a + b);
 
-    dump(b / a);
+    putd(b / a);
 
-    dump(c - 100);
+    putd(c - 100);
 
     exit(0);
 }

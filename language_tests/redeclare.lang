@@ -1,16 +1,18 @@
+include "std.lang"
+
 i64 main() {
     i64 a = 10;
 
     if a == 10 {
         a = 30;
         i64 b = 10;
-        dump(b);
+        putd(b);
     }
 
     i64 b = 20;
 
-    dump(b);
-    dump(a);
+    putd(b);
+    putd(a);
 
     exit(0);
 }

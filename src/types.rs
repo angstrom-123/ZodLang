@@ -10,6 +10,9 @@ impl Context {
     pub fn get_var_type(&self, node: &ParseNode) -> DataType {
         let res: Option<&DataType> = self.locals.get(&node.tok.val);
         if let Some(res) = res {
+            if *res == DataType::Unknown {
+                panic!("{} Error: Unknown type of variable `{}`", node.tok.pos, node.tok.val_str());
+            }
             res.clone()
         } else {
             panic!("{} Error: Could not find variable `{}`", node.tok.pos, node.tok.val_str());
@@ -120,6 +123,9 @@ impl Analyser {
                        node.tok.pos, expr_typ, node_typ);
             }
         }
+        if expr_typ == DataType::Unknown {
+            panic!("{} Error: Could not find type of expression.", expr.tok.pos);
+        }
 
         expr_typ
     }
@@ -131,30 +137,31 @@ impl Analyser {
             NodeType::BinaryOp => match node.tok.kind {
                 TokenType::OpSubscript => {
                     let rhs: &mut ParseNode = node.children.last_mut().unwrap();
-                    let rhs_typ: DataType = self.typecheck_factor(rhs, ctx);
-                    if rhs_typ != DataType::I64 {
-                        panic!("{} Error: Subscripts can only be integers. Expected `{:?}` but got `{:?}`",
-                               rhs.tok.pos, DataType::I64, rhs_typ);
+                    rhs.datatype = self.typecheck_factor(rhs, ctx);
+                    if !rhs.datatype.is_int() {
+                        panic!("{} Error: Subscripts can only be integers. Expected int but got `{:?}`",
+                               rhs.tok.pos, rhs.datatype);
                     }
 
                     let lhs: &mut ParseNode = node.children.first_mut().unwrap();
-                    let lhs_typ: DataType = ctx.get_var_type(lhs);
-                    match lhs_typ.base_type() {
+                    lhs.datatype = ctx.get_var_type(lhs);
+                    match lhs.datatype.base_type() {
                         Some(lhs_typ) => lhs_typ,
                         None => panic!("{} Error: Cannot subscript a `{:?}`", 
-                                       lhs.tok.pos, lhs_typ)
+                                       lhs.tok.pos, lhs.datatype)
                     }
                 },
                 _ => {
                     let lhs: &mut ParseNode = node.children.first_mut().unwrap();
-                    let lhs_typ: DataType = self.typecheck_factor(lhs, ctx);
+                    lhs.datatype = self.typecheck_factor(lhs, ctx);
+                    let ltyp: DataType = lhs.datatype.clone();
 
                     let rhs: &mut ParseNode = node.children.last_mut().unwrap();
-                    let rhs_typ: DataType = self.typecheck_factor(rhs, ctx);
+                    rhs.datatype = self.typecheck_factor(rhs, ctx);
 
-                    if !lhs_typ.is_compatible(&rhs_typ) {
+                    if !ltyp.is_compatible(&rhs.datatype) {
                         panic!("{} Error: Unexpected mixed types in expression. Expected `{:?}` but got `{:?}`", 
-                               node.tok.pos, lhs_typ, rhs_typ);
+                               node.tok.pos, ltyp, rhs.datatype);
                     }
 
                     if matches!(node.tok.kind, TokenType::OpEqual | TokenType::OpNotEqual | 
@@ -162,7 +169,7 @@ impl Analyser {
                                                TokenType::OpLessThan | TokenType::OpLessEqual) {
                         DataType::I64
                     } else {
-                        lhs_typ
+                        ltyp
                     }
                 },
             },
@@ -191,7 +198,7 @@ impl Analyser {
         let rhs: &mut ParseNode = returnn.children.first_mut().unwrap();
         let rhs_typ: DataType = self.typecheck_factor(rhs, ctx);
         let ret_typ: DataType = self.get_func_sig(&ctx.outer_func).ret_type;
-        if rhs_typ != ret_typ {
+        if !rhs_typ.is_compatible(&ret_typ) {
             panic!("{} Error: Invalid return type for function `{}`. Expected `{:?}` but got `{:?}`",
                    returnn.tok.pos, ctx.outer_func.tok.val_str(), ret_typ, rhs_typ);
         }
@@ -221,18 +228,17 @@ impl Analyser {
                 }
             },
             NodeType::BinaryOp => {
-                let l_child: &ParseNode = lhs.children.first().unwrap();
-                let r_child: &ParseNode = lhs.children.last().unwrap();
                 match lhs.tok.kind {
                     TokenType::OpSubscript => {
-                        self.typecheck_expr(r_child, ctx);
-                        let typ: Option<DataType> = self.typecheck_expr(l_child, ctx).base_type();
+                        let r_child: &mut ParseNode = lhs.children.last_mut().unwrap();
+                        self.typecheck_factor(r_child, ctx);
+
+                        let l_child: &mut ParseNode = lhs.children.first_mut().unwrap();
+                        self.typecheck_factor(l_child, ctx);
+                        let typ: Option<DataType> = l_child.datatype.base_type();
                         match typ {
-                            Some(typ) => {
-                                lhs.datatype = typ.clone();
-                                typ
-                            },
-                            None => panic!("{} Error: Cannot subscript a `{:?}`", l_child.tok.pos, typ)
+                            Some(typ) => typ,
+                            None => panic!("{} Error: Cannot subscript a `{:?}`", l_child.tok.pos, l_child.datatype)
                         }
                     },
                     _ => unreachable!()
@@ -256,7 +262,7 @@ impl Analyser {
     fn typecheck_syscall(&mut self, syscall: &mut ParseNode, ctx: &mut Context) -> DataType {
         for arg in &mut syscall.children {
             let arg_typ: DataType = self.typecheck_factor(arg, ctx);
-            if !matches!(arg_typ, DataType::I64 | DataType::I64Ptr | DataType::ChrPtr) {
+            if !arg_typ.is_int() && !arg_typ.is_ptr() {
                 panic!("{} Error: Syscalls only accept integers and pointers as arguments", 
                        syscall.tok.pos);
             }
@@ -293,15 +299,14 @@ impl Analyser {
     fn typecheck_conditional(&mut self, conditional: &mut ParseNode, ctx: &mut Context) {
         let cond: &mut ParseNode = conditional.children.first_mut().unwrap();
         let cond_typ: DataType = self.typecheck_factor(cond, ctx);
-        if !matches!(cond_typ, DataType::I64) {
-            panic!("{} Error: Invalid type for `if` condition. Expected `{:?}` but got `{:?}`",
-                   cond.tok.pos, DataType::I64, cond_typ);
+        if !cond_typ.is_int() {
+            panic!("{} Error: Invalid type for `if` condition. Expected int but got `{:?}`",
+                   cond.tok.pos, cond_typ);
         }
 
         let if_body: &mut ParseNode = conditional.children.get_mut(1).unwrap();
         self.typecheck_block(if_body, ctx);
 
-        // This is an optional field, so we don't care if it fails
         if let Some(else_body) = conditional.children.get_mut(2) {
             self.typecheck_block(else_body, ctx);
         }
@@ -322,9 +327,9 @@ impl Analyser {
         let cond: &mut ParseNode = for_loop.children.get_mut(2).unwrap();
         if !cond.is_null() {
             let cond_typ: DataType = self.typecheck_factor(cond, ctx);
-            if !matches!(cond_typ, DataType::I64) {
-                panic!("{} Error: Invalid type for `for` condition. Expected `{:?}` but got `{:?}`",
-                       cond.tok.pos, DataType::I64, cond_typ);
+            if !cond_typ.is_int() {
+                panic!("{} Error: Invalid type for `for` condition. Expected int but got `{:?}`",
+                       cond.tok.pos, cond_typ);
             }
         }
 
@@ -345,9 +350,9 @@ impl Analyser {
         let cond: &mut ParseNode = while_loop.children.first_mut().unwrap();
         if !cond.is_null() {
             let cond_typ: DataType = self.typecheck_factor(cond, ctx);
-            if !matches!(cond_typ, DataType::I64) {
-                panic!("{} Error: Invalid type for `while` condition. Expected `{:?}` but got `{:?}`",
-                       cond.tok.pos, DataType::I64, cond_typ);
+            if !cond_typ.is_int() {
+                panic!("{} Error: Invalid type for `while` condition. Expected int but got `{:?}`",
+                       cond.tok.pos, cond_typ);
             }
         }
 

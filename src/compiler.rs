@@ -74,7 +74,7 @@ impl Compiler {
         self.info("Performing Static Type Analysis");
         let mut analyser: Analyser = Analyser::new();
         analyser.typecheck_ast(&mut ast);
-    
+
         self.info("Generating Intermediate Representation");
         let mut ir: IR = IR::new();
         ir.generate_from_ast(&ast);
@@ -159,7 +159,6 @@ format!("
   \x1b[33m-p              --parsetree\x1b[0m:    Print parse tree
   \x1b[33m-r              --run\x1b[0m:          Run after compiling
   \x1b[33m-t              --tokens\x1b[0m:       Print tokens
-  \x1b[33m-u              --unsafe\x1b[0m:       Skip static type analysis
   \x1b[33m-v              --verbose\x1b[0m:      Enable info logging
 ", com)
 }

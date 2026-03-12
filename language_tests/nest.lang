@@ -1,3 +1,5 @@
+include "std.lang"
+
 i64 foo(i64 n) {
     return bar(n) + bar(n) + bar(bar(n));
 }
@@ -7,7 +9,7 @@ i64 bar(i64 n) {
 }
 
 i64 main() {
-    dump(foo(2));
+    putd(foo(2));
     exit(0);
 }
 

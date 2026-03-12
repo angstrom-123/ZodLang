@@ -1,3 +1,11 @@
+include "./linux.lang"
+
+// For now, this is an atrocious implementation.
+// Maybe one day I will write a better one and an accompanying free.
+any^ malloc(i64 len) {
+    return mmap(0, len, 3, 34, 0, -1);
+}
+
 i64 strlen(chr^ str) {
     chr c = str[0];
     i64 i = 1;
@@ -9,6 +17,43 @@ i64 strlen(chr^ str) {
 }
 
 i64 puts(chr^ str) {
-    i64 res = syscall(1, 1, str, strlen(str));
+    i64 res = write(1, str, strlen(str));
+    return res;
+}
+
+i64 mod(i64 x, i64 y) {
+    while x >= y {
+        x = x - y;
+    }
+    return x;
+}
+
+i64 putd(i64 x) {
+    if x == 0 {
+        return puts("0\n");
+    }
+
+    i64 orig = x;
+    if x < 0 { 
+       x = -x;
+    }
+
+    chr^ buf = malloc(4096);
+    i64 max_size = 32;
+    i64 size = 0;
+    while x > 0 {
+        buf[max_size - size - 1] = mod(x, 10) + '0';
+        size = size + 1;
+        x = x / 10;
+    }
+    if orig < 0 { // Negative, so we add the minus sign
+        buf[max_size - size - 1] = '-';
+        size = size + 1;
+    }
+
+    buf[max_size] = '\n';
+    i64 res = puts(buf + max_size - size);
+    munmap(buf, 4096);
+
     return res;
 }
