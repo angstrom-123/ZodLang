@@ -22,7 +22,7 @@ cargo test
 
 ### Run the Compiler
 ```
-./<compiler_path> <flags>
+<compiler_path> <input_file> <flags>
 ```
 
 | Flag         | Shorthand | Argument | Meaning                          |
