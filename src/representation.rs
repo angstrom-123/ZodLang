@@ -678,72 +678,73 @@ impl IR {
         self.instrs.push(Instruction::_define_intrinsic_munmap());
 
         // NOTE: Skipping the first 4 declarations, because those are the hardcoded intrinsice
-        for func in ast.root.children.iter().skip(4) {
-            if func.kind != NodeType::FuncDecl {
-                panic!("{} Error: {:?} `{}` is not allowed at the top level", func.tok.pos, func.kind, func.tok.val_str());
+        for stmt in ast.root.children.iter().skip(4) {
+            match stmt.kind {
+                NodeType::FuncDecl => {
+                    self.instrs.push(Instruction::_comment("Function Declaration"));
+
+                    let mut top_label: Label = Label::new_named("func_", &stmt.tok.val);
+                    let mut bottom_label: Label = Label::new(".epilogue");
+
+                    // Save function label
+                    self.record_label(&mut top_label);
+                    self.instrs.push(Instruction::_label(&top_label));
+
+                    // Prologue
+                    self.instrs.append(&mut vec![
+                        Instruction::_push_stack_register(Register::RBP),
+                        Instruction::_copy_register_b_to_a(Register::RBP, Register::RSP, 8),
+                    ]);
+
+                    // Args and context
+                    let mut ctx: Context = Context::new();
+                    ctx.stack_ix = -8;
+
+                    if let Some(args) = stmt.children.first() {
+                        if args.children.len() > 6 {
+                            panic!("{} Error: Currently only up to 6 function args are supported", stmt.tok.pos);
+                        }
+
+                        self.instrs.push(Instruction::_comment("Args"));
+
+                        // Save args as local variables on the stack
+                        for (i, arg) in args.children.iter().enumerate() {
+                            let reg: Register = USER_REG_ORDER[i];
+                            self.instrs.push(Instruction::_push_stack_register(reg));
+
+                            assert!(!matches!(arg.datatype, DataType::None | DataType::Unknown), "Variable type must be known");
+                            let var: Var = Var {
+                                typ: arg.datatype.clone(),
+                                offset: ctx.stack_ix,
+                            };
+                            ctx.locals.insert(arg.tok.val.clone(), var);
+                            ctx.stack_ix -= 8;
+                        }
+                    }
+
+                    // Body
+                    if let Some(body) = stmt.children.get(1) {
+                        self.instrs.push(Instruction::_comment("Body"));
+                        for stmt in &body.children {
+                            self.generate_from_statement(stmt, &mut ctx);
+                        }
+                    } else {
+                        panic!("{} Error: Expected function body for `{}` but found nothing", stmt.tok.val_str(), stmt.tok.pos);
+                    }
+
+                    // Epilogue
+                    self.record_label(&mut bottom_label);
+                    self.instrs.push(Instruction::_label(&bottom_label));
+
+                    // On a local stack frame so we automatically deallocate the locals when returning
+                    self.instrs.append(&mut vec![
+                        Instruction::_copy_register_b_to_a(Register::RSP, Register::RBP, 8),
+                        Instruction::_pop_stack(Register::RBP),
+                        Instruction::_return_to_caller(),
+                    ]);
+                },
+                _ => unreachable!()
             }
-
-            self.instrs.push(Instruction::_comment("Function Declaration"));
-
-            let mut top_label: Label = Label::new_named("func_", &func.tok.val);
-            let mut bottom_label: Label = Label::new(".epilogue");
-
-            // Save function label
-            self.record_label(&mut top_label);
-            self.instrs.push(Instruction::_label(&top_label));
-
-            // Prologue
-            self.instrs.append(&mut vec![
-                Instruction::_push_stack_register(Register::RBP),
-                Instruction::_copy_register_b_to_a(Register::RBP, Register::RSP, 8),
-            ]);
-
-            // Args and context
-            let mut ctx: Context = Context::new();
-            ctx.stack_ix = -8;
-
-            if let Some(args) = func.children.first() {
-                if args.children.len() > 6 {
-                    panic!("{} Error: Currently only up to 6 function args are supported", func.tok.pos);
-                }
-
-                self.instrs.push(Instruction::_comment("Args"));
-
-                // Save args as local variables on the stack
-                for (i, arg) in args.children.iter().enumerate() {
-                    let reg: Register = USER_REG_ORDER[i];
-                    self.instrs.push(Instruction::_push_stack_register(reg));
-
-                    assert!(!matches!(arg.datatype, DataType::None | DataType::Unknown), "Variable type must be known");
-                    let var: Var = Var {
-                        typ: arg.datatype.clone(),
-                        offset: ctx.stack_ix,
-                    };
-                    ctx.locals.insert(arg.tok.val.clone(), var);
-                    ctx.stack_ix -= 8;
-                }
-            }
-
-            // Body
-            if let Some(body) = func.children.get(1) {
-                self.instrs.push(Instruction::_comment("Body"));
-                for stmt in &body.children {
-                    self.generate_from_statement(stmt, &mut ctx);
-                }
-            } else {
-                panic!("{} Error: Expected function body for `{}` but found nothing", func.tok.val_str(), func.tok.pos);
-            }
-
-            // Epilogue
-            self.record_label(&mut bottom_label);
-            self.instrs.push(Instruction::_label(&bottom_label));
-
-            // On a local stack frame so we automatically deallocate the locals when returning
-            self.instrs.append(&mut vec![
-                Instruction::_copy_register_b_to_a(Register::RSP, Register::RBP, 8),
-                Instruction::_pop_stack(Register::RBP),
-                Instruction::_return_to_caller(),
-            ]);
         }
 
         self.instrs.push(Instruction::_start_data_segment());
@@ -815,7 +816,7 @@ impl IR {
         let label: Label = Label::new_named("func_", &call.tok.val);
         self.instrs.push(Instruction::_call_function(&label));
 
-        if call.datatype != DataType::None {
+        if call.datatype != DataType::Void {
             self.instrs.push(Instruction::_push_stack_register(Register::RAX));
         }
     }

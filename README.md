@@ -30,10 +30,9 @@ cargo test
 | --assembly   | -a        |          | Keep intermediate asm            |
 | --inter-repr | -ir       |          | Emit intermediate representation |
 | --output     | -o        | Out Path | Specify output path              |
-| --parsetree  | -p        |          | Print parse tree                 |
+| --parsetree  | -pt       |          | Print parse tree                 |
 | --run        | -r        |          | Run after compiling              |
 | --tokens     | -t        |          | Print lexed tokens               |
-| --unsafe     | -u        |          | Skip static type analysis        |
 | --verbose    | -v        |          | Enable info logging              |
 
 ## Examples
@@ -54,10 +53,10 @@ language.
 - [ ] Bitwise operators
 - [ ] Conditional elif
 - [ ] Ternary expressions
-- [ ] Compile-time type checking
-- [ ] Function param counting
+- [x] Compile-time type checking
+- [x] Function param counting
 - [ ] Global variables 
-- [ ] String type
-- [ ] Character type
+- [x] String type
+- [x] Character type
 - [ ] Structs 
-- [ ] Including other files
+- [x] Including other files

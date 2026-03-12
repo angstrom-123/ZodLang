@@ -1,4 +1,5 @@
 target/
+rust-analyzer/
 debug/
 **/.rs.bk
 output

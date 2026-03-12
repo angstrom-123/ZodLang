@@ -40,19 +40,21 @@ impl Analyser {
 
     pub fn typecheck_ast(&mut self, ast: &mut ParseTree) {
         // Record the signatures of all functions first
-        for func_decl in &ast.root.children {
-            if let Some(args) = func_decl.children.first() {
+        for top_lvl_stmt in &ast.root.children {
+            if top_lvl_stmt.kind == NodeType::FuncDecl && let Some(args) = top_lvl_stmt.children.first() {
                 let sig: FunctionSignature = FunctionSignature {
                     arg_types: args.children.iter().map(|x| x.datatype.clone()).collect(),
-                    ret_type: func_decl.datatype.clone(),
+                    ret_type: top_lvl_stmt.datatype.clone(),
                 };
-                self.funcs.insert(func_decl.tok.val.clone(), sig);
+                self.funcs.insert(top_lvl_stmt.tok.val.clone(), sig);
             }
         }
 
         // Typecheck bodies of all functions
-        for func_decl in &mut ast.root.children {
-            self.typecheck_func_decl(func_decl);
+        for top_lvl_stmt in &mut ast.root.children {
+            if top_lvl_stmt.kind == NodeType::FuncDecl {
+                self.typecheck_func_decl(top_lvl_stmt);
+            }
         }
     }
 

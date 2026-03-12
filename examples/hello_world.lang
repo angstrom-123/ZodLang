@@ -1,0 +1,6 @@
+include "std.lang"
+
+void main() {
+    puts("Hello, World!\n");
+    exit(0);
+}

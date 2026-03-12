@@ -7,6 +7,7 @@ use std::fmt;
 #[derive(Clone)]
 pub enum TokenType {
     None,
+
     OpPlus,
     OpMinus,
     OpMul,
@@ -29,6 +30,8 @@ pub enum TokenType {
     KeywordBreak,
     KeywordContinue,
     KeywordWhile,
+    KeywordInclude,
+    TypeVoid,
     TypeInt64,
     TypeInt64Ptr,
     TypeChr,
@@ -51,47 +54,49 @@ pub enum TokenType {
 impl TokenType {
     pub fn val_str(&self) -> &'static str {
         match self {
-            TokenType::None              => "",
-            TokenType::OpPlus            => "+",
-            TokenType::OpMinus           => "-",
-            TokenType::OpMul             => "*",
-            TokenType::OpDiv             => "/",
-            TokenType::OpAssign          => "=",
-            TokenType::OpEqual           => "==",
-            TokenType::OpNotEqual        => "!=",
-            TokenType::OpGreaterThan     => ">",
-            TokenType::OpLessThan        => "<",
-            TokenType::OpGreaterEqual    => ">=",
-            TokenType::OpLessEqual       => "<=",
-            TokenType::OpLogicalOr       => "||",
-            TokenType::OpLogicalAnd      => "&&",
-            TokenType::OpDereference     => "@",
-            TokenType::OpSubscript       => "[",
-            TokenType::KeywordReturn     => "return",
-            TokenType::KeywordIf         => "if",
-            TokenType::KeywordElse       => "else",
-            TokenType::KeywordFor        => "for",
-            TokenType::KeywordBreak      => "break",
-            TokenType::KeywordContinue   => "continue",
-            TokenType::KeywordWhile      => "while",
-            TokenType::TypeInt64         => "i64",
-            TokenType::TypeInt64Ptr      => "i64^",
-            TokenType::TypeChr           => "chr",
-            TokenType::TypeChrPtr        => "chr^",
-            TokenType::TypeAnyPtr        => "any^",
-            TokenType::Int               => "literal int",
-            TokenType::String            => "literal string",
-            TokenType::Char              => "literal char",
-            TokenType::Syscall           => "syscall",
-            TokenType::End               => ";",
-            TokenType::Separator         => ",",
-            TokenType::OpenParen         => "(",
-            TokenType::CloseParen        => ")",
-            TokenType::OpenSquare        => "[",
-            TokenType::CloseSquare       => "]",
-            TokenType::OpenScope         => "{",
-            TokenType::CloseScope        => "}",
-            TokenType::Identifier        => "identifier",
+            TokenType::None                  => "",
+            TokenType::OpPlus                => "+",
+            TokenType::OpMinus               => "-",
+            TokenType::OpMul                 => "*",
+            TokenType::OpDiv                 => "/",
+            TokenType::OpAssign              => "=",
+            TokenType::OpEqual               => "==",
+            TokenType::OpNotEqual            => "!=",
+            TokenType::OpGreaterThan         => ">",
+            TokenType::OpLessThan            => "<",
+            TokenType::OpGreaterEqual        => ">=",
+            TokenType::OpLessEqual           => "<=",
+            TokenType::OpLogicalOr           => "||",
+            TokenType::OpLogicalAnd          => "&&",
+            TokenType::OpDereference         => "@",
+            TokenType::OpSubscript           => "[",
+            TokenType::KeywordReturn         => "return",
+            TokenType::KeywordIf             => "if",
+            TokenType::KeywordElse           => "else",
+            TokenType::KeywordFor            => "for",
+            TokenType::KeywordBreak          => "break",
+            TokenType::KeywordContinue       => "continue",
+            TokenType::KeywordWhile          => "while",
+            TokenType::KeywordInclude        => "include",
+            TokenType::TypeVoid              => "void",
+            TokenType::TypeInt64             => "i64",
+            TokenType::TypeInt64Ptr          => "i64^",
+            TokenType::TypeChr               => "chr",
+            TokenType::TypeChrPtr            => "chr^",
+            TokenType::TypeAnyPtr            => "any^",
+            TokenType::Int                   => "literal int",
+            TokenType::String                => "literal string",
+            TokenType::Char                  => "literal char",
+            TokenType::Syscall               => "syscall",
+            TokenType::End                   => ";",
+            TokenType::Separator             => ",",
+            TokenType::OpenParen             => "(",
+            TokenType::CloseParen            => ")",
+            TokenType::OpenSquare            => "[",
+            TokenType::CloseSquare           => "]",
+            TokenType::OpenScope             => "{",
+            TokenType::CloseScope            => "}",
+            TokenType::Identifier            => "identifier",
         }
     }
 }
@@ -101,16 +106,17 @@ impl TokenType {
 #[derive(Hash)]
 #[derive(Clone)]
 pub struct Pos {
-    pub row: usize,
-    pub col: usize,
+    pub row: u32,
+    pub col: u32,
+    pub file: String,
 }
 impl fmt::Display for Pos {
     // NOTE: Stored row and column are indices starting from 0, whereas in files, we count from 1.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.row == usize::MAX || self.col == usize::MAX {
+        if self.row == u32::MAX || self.col == u32::MAX {
             return write!(f, "[NULL     ]");
         }
-        write!(f, "[{:>4}:{:>4}]", self.row + 1, self.col + 1)
+        write!(f, "[{:>4}:{:>4}]:{}", self.row + 1, self.col + 1, self.file)
     }
 }
 
@@ -130,8 +136,13 @@ impl Pos {
 #[derive(Clone)]
 pub struct Token {
     pub kind: TokenType,
-    pub val:  Vec<u8>,
-    pub pos:  Pos,
+    pub val: Vec<u8>,
+    pub pos: Pos,
+}
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {:?} `{}`", self.pos(), self.kind, self.val_str())
+    }
 }
 impl Token {
     pub fn val_str(&self) -> String {
@@ -142,6 +153,7 @@ impl Token {
         Pos {
             row: self.pos.row + 1,
             col: self.pos.col + 1,
+            file: self.pos.file.clone()
         }
     }
 
@@ -149,7 +161,7 @@ impl Token {
         Token {
             kind: TokenType::None,
             val: vec![],
-            pos: Pos { row: usize::MAX, col: usize::MAX },
+            pos: Pos { row: u32::MAX, col: u32::MAX, file: String::from("NULL") },
         }
     }
 
@@ -157,28 +169,39 @@ impl Token {
         Token {
             kind: TokenType::None,
             val: vec![],
-            pos,
+            pos: pos.clone(),
         }
     }
 }
 
 pub struct Lexer {
     pub toks: Vec<Token>,
-    pub pos:  Pos,
-    src:      Vec<u8>,
-    cur:      usize,
-    rune:     u8,
+    pub pos: Pos,
+    src: Vec<u8>,
+    pub cur: usize,
+    pub rune: u8,
 }
 impl Lexer {
-    pub fn new(src: Vec<u8>) -> Self {
+    pub fn new(src: Vec<u8>, file: &str) -> Self {
         let first = *src.first().expect("Error: Provided source file is empty");
         Lexer { 
             toks: Vec::new(),
-            pos: Pos { row: 0, col: 0 },
+            pos: Pos { row: 0, col: 0, file: file.to_string() },
             src,
             cur: 0,
             rune: first,
         }
+    }
+
+    pub fn dump(&self) {
+        for tok in &self.toks {
+            eprintln!("{}", tok);
+        }
+    }
+
+    pub fn refresh(&mut self) {
+        self.cur = 0;
+        self.rune = *self.src.first().unwrap();
     }
 
     pub fn has_token(&self) -> bool {
@@ -202,7 +225,8 @@ impl Lexer {
     }
 
     pub fn expect_type(&mut self) -> Token {
-        const KINDS: [TokenType; 5] = [
+        const KINDS: [TokenType; 6] = [
+            TokenType::TypeVoid,
             TokenType::TypeInt64,
             TokenType::TypeInt64Ptr,
             TokenType::TypeChr,
@@ -240,14 +264,6 @@ impl Lexer {
         panic!("{} Error: Expected `{}` but got `{}`",  tok.pos, kind.val_str(), tok.val_str());
     }
 
-    pub fn dump_remaining_tokens(&mut self) {
-        eprintln!("Lexer Dump:");
-        for i in self.cur..self.toks.len() {
-            let tok = self.toks.get(i).expect("Error: Lexer failed to dump next token");
-            eprintln!("{}", tok.val_str());
-        }
-    }
-
     pub fn vec_val(v: &Vec<u8>) -> i64 {
         assert!(!v.is_empty(), "Cannot convert empty vector to int");
         let base: i64 = 10;
@@ -270,7 +286,7 @@ impl Lexer {
                         self.toks.push(Token {
                             kind: TokenType::None,
                             val: lexeme.clone(),
-                            pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() },
+                            pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                         });
                         lexeme.clear();
                     }
@@ -287,7 +303,7 @@ impl Lexer {
                             self.toks.push(Token {
                                 kind: TokenType::None,
                                 val: lexeme.clone(),
-                                pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() },
+                                pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                             });
                             lexeme.clear();
                         }
@@ -300,7 +316,7 @@ impl Lexer {
                         self.toks.push(Token {
                             kind: TokenType::None,
                             val: lexeme.clone(),
-                            pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() },
+                            pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                         });
                         lexeme.clear();
                     }
@@ -327,7 +343,7 @@ impl Lexer {
                     self.toks.push(Token {
                         kind: TokenType::None,
                         val: lexeme.clone(),
-                        pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() },
+                        pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                     });
                     lexeme.clear();
                 },
@@ -336,7 +352,7 @@ impl Lexer {
                         self.toks.push(Token {
                             kind: TokenType::None,
                             val: lexeme.clone(),
-                            pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() },
+                            pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                         });
                         lexeme.clear();
                     }
@@ -369,7 +385,7 @@ impl Lexer {
                         self.toks.push(Token {
                             kind: TokenType::None,
                             val: lexeme.clone(),
-                            pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() },
+                            pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                         });
                         lexeme.clear();
                     }
@@ -378,7 +394,7 @@ impl Lexer {
                     self.toks.push(Token {
                         kind: TokenType::None,
                         val: lexeme.clone(),
-                        pos: Pos { row: self.pos.row, col: self.pos.col },
+                        pos: Pos { row: self.pos.row, col: self.pos.col, file: self.pos.file.clone() },
                     });
                     lexeme.clear();
                 },
@@ -387,7 +403,7 @@ impl Lexer {
                         self.toks.push(Token {
                             kind: TokenType::None,
                             val: lexeme.clone(),
-                            pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() },
+                            pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                         });
                         lexeme.clear();
                     }
@@ -402,7 +418,7 @@ impl Lexer {
                             self.toks.push(Token {
                                 kind: TokenType::None,
                                 val: lexeme.clone(),
-                                pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() },
+                                pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                             });
                             lexeme.clear();
                             lexeme.push(self.rune);
@@ -420,7 +436,7 @@ impl Lexer {
                         self.toks.push(Token {
                             kind: TokenType::None,
                             val: lexeme.clone(),
-                            pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() },
+                            pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                         });
                         lexeme.clear();
                     } else {
@@ -436,7 +452,7 @@ impl Lexer {
                             self.toks.push(Token {
                                 kind: TokenType::None,
                                 val: lexeme.clone(),
-                                pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() },
+                                pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                             });
                             lexeme.clear();
                             lexeme.push(self.rune);
@@ -450,7 +466,7 @@ impl Lexer {
                         self.toks.push(Token {
                             kind: TokenType::None,
                             val: lexeme.clone(),
-                            pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() },
+                            pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                         });
                         lexeme.clear();
                     }
@@ -528,7 +544,9 @@ impl Lexer {
                     "continue" => tok.kind = TokenType::KeywordContinue,
                     "break"    => tok.kind = TokenType::KeywordBreak,
                     "return"   => tok.kind = TokenType::KeywordReturn,
+                    "include"  => tok.kind = TokenType::KeywordInclude,
                     // Types
+                    "void"     => tok.kind = TokenType::TypeVoid,
                     "i64"      => tok.kind = TokenType::TypeInt64,
                     "i64^"     => tok.kind = TokenType::TypeInt64Ptr,
                     "chr"      => tok.kind = TokenType::TypeChr,

@@ -7,7 +7,6 @@ i64 fib(i64 n) {
 }
 
 i64 main() {
-    i64 a = mmap(4096);
     dump(fib(1 + 2 + 3 +4)); // 55
     exit(0);
 }

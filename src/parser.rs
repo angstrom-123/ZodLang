@@ -3,7 +3,8 @@ use crate::lexer::Pos;
 use crate::lexer::Token;
 use crate::lexer::TokenType;
 
-// <Prog>           : { <Func-Decl> }
+// <Prog>           : { ( <Func-Decl> | <Include> ) }
+// <Include>        : "include" <Literal-String>
 // <Var-Decl>       : <Type> <Name> [ "=" <Additive> ]
 // <Func-Decl>      : <Type> <Name> "(" [ <Type> <Name> { "," <Type> <Name> } ] ")" "{" { <Statement> } "}"
 // <Func-Call>      : <Name> "(" [ <Union> { "," <Union> } ] ")"
@@ -31,6 +32,7 @@ use crate::lexer::TokenType;
 //                  | <Literal-String> 
 //                  | <Literal-Char>
 //                  | <Func-Call> 
+//                  | <Syscall> 
 //                  | "(" <Union> ")" 
 //                  | <Unary> <Factor> 
 //                  | <Ident>
@@ -43,6 +45,7 @@ use crate::lexer::TokenType;
 pub enum DataType {
     None,
     Unknown,
+    Void,
     I64,
     I64Ptr,
     Chr,
@@ -52,6 +55,7 @@ pub enum DataType {
 impl DataType {
     pub fn from_token(tok: &Token) -> DataType {
         match tok.kind {
+            TokenType::TypeVoid => DataType::Void,
             TokenType::TypeInt64 => DataType::I64,
             TokenType::TypeInt64Ptr => DataType::I64Ptr,
             TokenType::TypeChr => DataType::Chr,
@@ -90,6 +94,7 @@ impl DataType {
             DataType::Chr    => matches!(other, DataType::Chr),
             DataType::ChrPtr => matches!(other, DataType::AnyPtr | DataType::ChrPtr | DataType::I64),
             DataType::AnyPtr => matches!(other, DataType::AnyPtr | DataType::ChrPtr | DataType::I64Ptr | DataType::I64),
+            DataType::Void   => matches!(other, DataType::Void),
             _ => false
         }
     }
@@ -109,6 +114,7 @@ impl DataType {
 pub enum NodeType {
     Null,
     Group,
+    Include,
     Var,
     LiteralInt,
     LiteralString,
@@ -221,6 +227,15 @@ impl ParseNode {
             datatype: DataType::Chr,
             tok,
             children: vec![]
+        }
+    }
+
+    fn _include(tok: Token, rhs: ParseNode) -> Self {
+        ParseNode {
+            kind: NodeType::Include,
+            datatype: DataType::None,
+            tok,
+            children: vec![rhs],
         }
     }
 
@@ -402,19 +417,19 @@ impl <'a> ParseTree<'a> {
     // they were regular functions, this lets the type checker pass.
     pub fn construct(&mut self, lexer: &mut Lexer) {
         let mut children: Vec<ParseNode> = Vec::new();
-        let exit = ParseNode::_func_decl(DataType::None, 
+        let exit = ParseNode::_func_decl(DataType::Void, 
                                          Token { 
                                              kind: TokenType::Identifier, 
                                              val: Vec::from(b"exit"),
-                                             pos: Pos { row: usize::MAX, col: usize::MAX } 
+                                             pos: Pos { row: u32::MAX, col: u32::MAX, file: String::from("Hardcoded") } 
                                          },
                                          vec![ParseNode::_var_decl(DataType::I64, Token::null())], 
                                          vec![]);
-        let dump = ParseNode::_func_decl(DataType::None, 
+        let dump = ParseNode::_func_decl(DataType::Void, 
                                          Token { 
                                              kind: TokenType::Identifier, 
                                              val: Vec::from(b"dump"),
-                                             pos: Pos { row: usize::MAX, col: usize::MAX } 
+                                             pos: Pos { row: u32::MAX, col: u32::MAX, file: String::from("Hardcoded") } 
                                          },
                                          vec![ParseNode::_var_decl(DataType::I64, Token::null())], 
                                          vec![]);
@@ -422,7 +437,7 @@ impl <'a> ParseTree<'a> {
                                          Token { 
                                              kind: TokenType::Identifier, 
                                              val: Vec::from(b"mmap"),
-                                             pos: Pos { row: usize::MAX, col: usize::MAX } 
+                                             pos: Pos { row: u32::MAX, col: u32::MAX, file: String::from("Hardcoded") } 
                                          },
                                          vec![ParseNode::_var_decl(DataType::I64, Token::null())], 
                                          vec![]);
@@ -430,15 +445,34 @@ impl <'a> ParseTree<'a> {
                                            Token { 
                                                kind: TokenType::Identifier, 
                                                val: Vec::from(b"munmap"),
-                                               pos: Pos { row: usize::MAX, col: usize::MAX } 
+                                               pos: Pos { row: u32::MAX, col: u32::MAX, file: String::from("Hardcoded") } 
                                            },
                                            vec![ParseNode::_var_decl(DataType::AnyPtr, Token::null()),
                                                 ParseNode::_var_decl(DataType::I64, Token::null())], 
                                            vec![]);
+
         children.append(&mut vec![dump, exit, mmap, munmap]);
 
         while lexer.has_token() {
-            children.push(self.parse_func_decl(lexer));
+            let tok: Token = lexer.peek_token();
+            match tok.kind {
+                // <Func-Decl> : <Type> <Var> "(" [ <Type> <Var> { "," <Type> <Var> } ] ")" "{" { <Statement> } "}"
+                TokenType::TypeVoid
+                | TokenType::TypeInt64 
+                | TokenType::TypeInt64Ptr 
+                | TokenType::TypeChr 
+                | TokenType::TypeChrPtr 
+                | TokenType::TypeAnyPtr => {
+                    children.push(self.parse_func_decl(lexer));
+                },
+                // <Include> : "include" <Literal-String>
+                TokenType::KeywordInclude => {
+                    let tok: Token = lexer.consume_token();
+                    let file: Token = lexer.expect_token(TokenType::String);
+                    children.push(ParseNode::_include(tok, ParseNode::_literal_string(file)));
+                },
+                _ => panic!("{} Error: Unexpected top level statement `{}`", tok.pos, tok.val_str())
+            }
         }
         self.root.children = children;
     }
@@ -510,7 +544,7 @@ impl <'a> ParseTree<'a> {
 
     // <Func-Decl> : <Type> <Var> "(" [ <Type> <Var> { "," <Type> <Var> } ] ")" "{" { <Statement> } "}"
     fn parse_func_decl(&mut self, lexer: &mut Lexer) -> ParseNode {
-        let datatype: DataType = DataType::from_token(&lexer.expect_tokens(vec![TokenType::TypeInt64, TokenType::TypeInt64Ptr, TokenType::TypeChr, TokenType::TypeChrPtr, TokenType::TypeAnyPtr]));
+        let datatype: DataType = DataType::from_token(&lexer.expect_type());
         let ident: Token = lexer.expect_token(TokenType::Identifier);
 
         // Function arguments between parens
@@ -521,7 +555,7 @@ impl <'a> ParseTree<'a> {
             if !args.is_empty() {
                 lexer.expect_token(TokenType::Separator);
             }
-            let arg_type: DataType = DataType::from_token(&lexer.expect_tokens(vec![TokenType::TypeInt64, TokenType::TypeInt64Ptr, TokenType::TypeChr, TokenType::TypeChrPtr, TokenType::TypeAnyPtr]));
+            let arg_type: DataType = DataType::from_token(&lexer.expect_type());
             let arg_ident: Token = lexer.expect_token(TokenType::Identifier);
             args.push(ParseNode::_var_decl(arg_type, arg_ident));
         }
@@ -598,22 +632,11 @@ impl <'a> ParseTree<'a> {
             lexer.consume_token();
             let operator: Token = Token {
                 kind: TokenType::OpAssign,
-                val: Vec::from("+"),
-                pos: Pos { row: usize::MAX, col: usize::MAX },
+                val: Vec::from("="),
+                pos: Pos { row: u32::MAX, col: u32::MAX, file: String::from("Implicit") },
             };
             (lhs, ParseNode::_assign(operator, ParseNode::_var(ident), ParseNode::_zero_literal()))
         }
-        // let operator: Token = lexer.peek_token();
-        // if operator.kind == TokenType::OpAssign {
-        //     lexer.consume_token();
-        //     rhs = Some(self.parse_expression(lexer, Precedence::Union as usize));
-        // }
-        // let lhs: ParseNode = ParseNode::_var_decl(datatype, ident.clone());
-        // if let Some(rhs) = rhs {
-        //     (lhs, ParseNode::_assign(operator, ParseNode::_var(ident), rhs))
-        // } else {
-        //     (lhs, ParseNode::_assign(operator, ParseNode::_var(ident), ParseNode::_zero_literal()))
-        // }
     }
 
     // <Union>          : <Intersection> [ "||" <Intersection> ]
@@ -639,6 +662,7 @@ impl <'a> ParseTree<'a> {
     // <Factor> : <Literal-Int> 
     //          | <Literal-String> 
     //          | <Func-Call> 
+    //          | <Syscall> 
     //          | "(" <Union> ")" 
     //          | <Unary> <Factor> 
     //          | <Ident>
@@ -648,12 +672,12 @@ impl <'a> ParseTree<'a> {
             TokenType::Int => ParseNode::_literal_int(lexer.consume_token()),
             TokenType::String => ParseNode::_literal_string(lexer.consume_token()),
             TokenType::Char => ParseNode::_literal_char(lexer.consume_token()),
+            TokenType::Syscall => self.parse_syscall(lexer),
             TokenType::Identifier => {
                 if lexer.peek_next_token().kind == TokenType::OpenParen {
                     self.parse_func_call(lexer)
                 } else {
                     self.parse_ident(lexer)
-                    // ParseNode::_var(lexer.consume_token())
                 }
             },
             TokenType::OpenParen => {
@@ -695,17 +719,12 @@ impl <'a> ParseTree<'a> {
 
                 let mut decl: Option<ParseNode> = None;
                 let mut init: Option<ParseNode> = None;
-                if matches!(lexer.peek_token().kind, TokenType::TypeInt64Ptr | TokenType::TypeInt64 | TokenType::TypeChrPtr | TokenType::TypeChr | TokenType::TypeAnyPtr) {
+                if matches!(lexer.peek_token().kind, TokenType::TypeVoid | TokenType::TypeInt64Ptr | TokenType::TypeInt64 | TokenType::TypeChrPtr | TokenType::TypeChr | TokenType::TypeAnyPtr) {
                     let (d, i) = self.parse_var_decl(lexer);
                     decl = Some(d);
                     init = Some(i);
                 } else if lexer.peek_token().kind != TokenType::End {
                     init = Some(self.parse_assign(lexer));
-
-                    // let ident: Token = lexer.expect_token(TokenType::Identifier);
-                    // let assign: Token = lexer.expect_token(TokenType::OpAssign);
-                    // let rhs: ParseNode = self.parse_expression(lexer, Precedence::Additive as usize);
-                    // init = Some(ParseNode::_assign(assign, ParseNode::_var(ident), rhs));
                 }
 
                 lexer.expect_token(TokenType::End);
@@ -724,20 +743,6 @@ impl <'a> ParseTree<'a> {
                     } else {
                         post = Some(self.parse_assign(lexer));
                     }
-                    // } else if lexer.peek_token().kind == TokenType::Identifier {
-                    //     let ident: Token = lexer.expect_token(TokenType::Identifier);
-                    //     let assign: Token = lexer.expect_token(TokenType::OpAssign);
-                    //     let rhs: ParseNode = self.parse_expression(lexer, Precedence::Additive as usize);
-                    //     post = Some(ParseNode::_assign(assign, ParseNode::_var(ident), rhs));
-                    // } else if lexer.peek_token().kind == TokenType::OpDereference {
-                    //     let deref: Token = lexer.consume_token();
-                    //     let ident: Token = lexer.expect_token(TokenType::Identifier);
-                    //     let assign: Token = lexer.expect_token(TokenType::OpAssign);
-                    //     let rhs: ParseNode = self.parse_expression(lexer, Precedence::Additive as usize);
-                    //     post = Some(ParseNode::_assign(assign, ParseNode::_unary_op(deref, ParseNode::_var(ident)), rhs));
-                    // } else {
-                    //     panic!("{} Error: Expected assign or function call but got `{}`", lexer.peek_token().pos, lexer.peek_token().val_str());
-                    // }
                 }
 
                 // For body between scopes
@@ -818,7 +823,12 @@ impl <'a> ParseTree<'a> {
                 vec![expr]
             },
             // <Var-Decl> ";"
-            TokenType::TypeInt64 | TokenType::TypeInt64Ptr | TokenType::TypeChr | TokenType::TypeChrPtr | TokenType::TypeAnyPtr => {
+            TokenType::TypeVoid 
+            | TokenType::TypeInt64
+            | TokenType::TypeInt64Ptr
+            | TokenType::TypeChr
+            | TokenType::TypeChrPtr
+            | TokenType::TypeAnyPtr => {
                 let (decl, init) = self.parse_var_decl(lexer);
                 lexer.expect_token(TokenType::End);
                 vec![decl, init]
@@ -828,25 +838,6 @@ impl <'a> ParseTree<'a> {
                 let expr: ParseNode = self.parse_assign(lexer);
                 lexer.expect_token(TokenType::End);
                 vec![expr]
-                // let deref = lexer.consume_token();
-                // if lexer.peek_token().kind == TokenType::Identifier {
-                //     let ident: Token = lexer.expect_token(TokenType::Identifier);
-                //     let operator: Token = lexer.consume_token();
-                //     let rhs: ParseNode = self.parse_expression(lexer, Precedence::Additive as usize);
-                //     let expr: ParseNode = ParseNode::_assign(operator, ParseNode::_unary_op(deref, ParseNode::_var(ident)), rhs);
-                //     lexer.expect_token(TokenType::End);
-                //     vec![expr]
-                // } else {
-                //     lexer.expect_token(TokenType::OpenParen);
-                //     let lhs: ParseNode = self.parse_expression(lexer, Precedence::Additive as usize);
-                //     lexer.expect_token(TokenType::CloseParen);
-                //
-                //     let operator: Token = lexer.consume_token();
-                //     let rhs: ParseNode = self.parse_expression(lexer, Precedence::Additive as usize);
-                //     let expr: ParseNode = ParseNode::_assign(operator, ParseNode::_unary_op(deref, lhs), rhs);
-                //     lexer.expect_token(TokenType::End);
-                //     vec![expr]
-                // }
             },
             _ => panic!("{} Error: Expected statement but got `{}`", lexer.peek_token().pos, lexer.peek_token().val_str())
         }
