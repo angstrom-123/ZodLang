@@ -61,3 +61,5 @@ fn test_memory() { run_test("memory"); }
 fn test_index() { run_test("index"); }
 #[test]
 fn test_string() { run_test("string"); }
+#[test]
+fn test_rule110() { run_test("rule110"); }
