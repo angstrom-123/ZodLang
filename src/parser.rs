@@ -26,7 +26,7 @@ use crate::lexer::TokenType;
 // <Intersection>   : <Equality>     [ "&&" <Equality> ]
 // <Equality>       : <Relational> [ ( "==" | "!=" ) <Relational> ]
 // <Relational>     : <Additive>   [ ( "<" | ">" | "<=" | ">=" ) <Additive> ]
-// <Additive>       : <Term>       [ ( "+" | "-" ) <Term> ]
+// <Additive>       : <Term>       [ ( "+" | "-" | "%" ) <Term> ]
 // <Term>           : <Factor>     [ ( "*" | "/" ) <Factor> ]
 // <Factor>         : <Literal-Int> 
 //                  | <Literal-String> 
@@ -91,8 +91,8 @@ impl DataType {
         matches!(self, DataType::I64Ptr | DataType::ChrPtr | DataType::AnyPtr)
     }
 
-    pub fn is_int(&self) -> bool {
-        matches!(self, DataType::I64)
+    pub fn is_numeric(&self) -> bool {
+        matches!(self, DataType::I64 | DataType::Chr)
     }
 
     pub fn is_compatible(&self, other: &DataType) -> bool {
@@ -414,7 +414,7 @@ impl <'a> ParseTree<'a> {
             &[TokenType::OpLogicalAnd],
             &[TokenType::OpEqual, TokenType::OpNotEqual],
             &[TokenType::OpGreaterThan, TokenType::OpGreaterEqual, TokenType::OpLessThan, TokenType::OpLessEqual],
-            &[TokenType::OpPlus, TokenType::OpMinus],
+            &[TokenType::OpPlus, TokenType::OpMinus, TokenType::OpMod],
             &[TokenType::OpMul, TokenType::OpDiv],
             &[]
         ];

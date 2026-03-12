@@ -65,15 +65,17 @@ impl Compiler {
         self.info("Constructing AST");
         let mut ast: ParseTree = ParseTree::new();
         ast.construct(&mut lexer);
+
+        self.info("Performing Static Type Analysis");
+        let mut analyser: Analyser = Analyser::new();
+        analyser.typecheck_ast(&mut ast);
+
         if self.flags.contains(&Flag::EmitParseTree) {
             self.info("Emitting Parse Tree:");
             ast.dump();
             eprintln!();
         }
     
-        self.info("Performing Static Type Analysis");
-        let mut analyser: Analyser = Analyser::new();
-        analyser.typecheck_ast(&mut ast);
 
         self.info("Generating Intermediate Representation");
         let mut ir: IR = IR::new();
@@ -153,12 +155,13 @@ format!("
   {} \x1b[33m<input-file> <flags>\x1b[0m 
 
 \x1b[92mFLAGS:\x1b[0m
-  \x1b[33m-a              --assembly\x1b[0m:     Keep intermediate assembly
-  \x1b[33m-ir             --inter-repr\x1b[0m:   Print intermediate representation
-  \x1b[33m-o    <path>    --output\x1b[0m:       Specify output file path
-  \x1b[33m-p              --parsetree\x1b[0m:    Print parse tree
-  \x1b[33m-r              --run\x1b[0m:          Run after compiling
-  \x1b[33m-t              --tokens\x1b[0m:       Print tokens
-  \x1b[33m-v              --verbose\x1b[0m:      Enable info logging
+  \x1b[33m-a              --assembly             \x1b[0m      Keep intermediate assembly
+  \x1b[33m-ir             --inter-repr           \x1b[0m      Print intermediate representation
+  \x1b[33m-I    <path>    --include     <path>   \x1b[0m      Specify path to search for includes
+  \x1b[33m-o    <path>    --output      <path>   \x1b[0m      Specify output file path
+  \x1b[33m-p              --parsetree            \x1b[0m      Print parse tree
+  \x1b[33m-r              --run                  \x1b[0m      Run after compiling
+  \x1b[33m-t              --tokens               \x1b[0m      Print tokens
+  \x1b[33m-v              --verbose              \x1b[0m      Enable info logging
 ", com)
 }

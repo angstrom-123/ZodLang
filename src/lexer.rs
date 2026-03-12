@@ -13,6 +13,7 @@ pub enum TokenType {
     OpMul,
     OpDiv,
     OpAssign,
+    OpMod,
     OpEqual,
     OpNotEqual,
     OpGreaterThan,
@@ -60,6 +61,7 @@ impl TokenType {
             TokenType::OpMul                 => "*",
             TokenType::OpDiv                 => "/",
             TokenType::OpAssign              => "=",
+            TokenType::OpMod                 => "%",
             TokenType::OpEqual               => "==",
             TokenType::OpNotEqual            => "!=",
             TokenType::OpGreaterThan         => ">",
@@ -380,7 +382,7 @@ impl Lexer {
                         }
                     }
                 },
-                b'@' | b';' | b'+' | b'*' | b'(' | b')' | b'{' | b'}' | b'[' | b']' => {
+                b'@' | b';' | b'+' | b'*' | b'(' | b')' | b'{' | b'}' | b'[' | b']' | b'%' => {
                     if !lexeme.is_empty() {
                         self.toks.push(Token {
                             kind: TokenType::None,
@@ -523,6 +525,7 @@ impl Lexer {
                     b'}' => tok.kind = TokenType::CloseScope,
                     b';' => tok.kind = TokenType::End,
                     b',' => tok.kind = TokenType::Separator,
+                    b'%' => tok.kind = TokenType::OpMod,
                     b'0'..=b'9' => tok.kind = TokenType::Int,
                     b'A'..=b'z' => tok.kind = TokenType::Identifier,
                     _ => panic!("{} Error: Invalid token `{}`", tok.pos, tok.val_str()),

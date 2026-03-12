@@ -1063,6 +1063,15 @@ impl IR {
         match node.kind {
             NodeType::BinaryOp => {
                 match node.tok.kind {
+                    TokenType::OpMod => {
+                        self.instrs.push(Instruction::_comment("BinOp Mod"));
+                        self.instrs.append(&mut vec![
+                            Instruction::_pop_stack(Register::RBX),
+                            Instruction::_pop_stack(Register::RAX),
+                            Instruction::_div_a_by_b_mangling_d(Register::RAX, Register::RBX, node.datatype.size()),
+                            Instruction::_push_stack_register(Register::RDX),
+                        ]);
+                    },
                     TokenType::OpPlus => {
                         self.instrs.push(Instruction::_comment("BinOp Plus"));
                         self.instrs.append(&mut vec![

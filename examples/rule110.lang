@@ -1,0 +1,70 @@
+include "std.lang"
+
+void main() {
+    // Allocate buffer
+    chr^ buf = malloc(4096);
+
+    // Constant
+    i64 wid = 100;
+
+    // Allocate sub buffers (leaving space for null terminator)
+    chr^ line_1 = buf;
+    chr^ line_2 = buf + wid + 1;
+    chr^ window = buf + (wid + 1) * 2;
+
+    // Zero out 2 lines of the buffer for use
+    for i64 i = 0; i < wid; i = i + 1 {
+        line_1[i] = ' ';
+        line_2[i] = ' ';
+    }
+
+    // Initial state
+    line_1[wid - 1] = '#';
+
+    for i64 row = 0; row < wid; row = row + 1 {
+        for i64 col = 0; col < wid; col = col + 1 {
+            // Left of window
+            if col > 0 { window[0] = line_1[col - 1]; } 
+            else       { window[0] = line_1[wid - 1]; }
+
+            // Centre of window
+            window[1] = line_1[col];
+
+            // Right of window
+            if col < wid - 1 { window[2] = line_1[col + 1]; } 
+            else             { window[2] = line_1[0]; }
+
+            // Apply the rule
+            if streq(window, "###") || streq(window, "#  ") || streq(window, "   ") {
+                line_2[col] = ' ';
+            } else { 
+                line_2[col] = '#';
+            }
+        }
+
+        // print line 1
+        write(1, line_1, wid + 1); // null terminated
+        write(1, "\n", 1);
+
+        // Swap the buffers 
+        chr^ tmp = line_1;
+        line_1 = line_2;
+        line_2 = tmp;
+    }
+
+    munmap(buf, 4096);
+    exit(0);
+}
+
+i64 streq(chr^ a, chr^ b) {
+    i64 len_a = strlen(a);
+    if len_a != strlen(b) {
+        return 0;
+    }
+    for i64 i = 0; i < len_a; i = i + 1 {
+        if a[i] != b[i] {
+            return 0;
+        }
+    }
+    return 1;
+}

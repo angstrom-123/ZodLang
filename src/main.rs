@@ -32,6 +32,10 @@ fn main() {
             "-r" | "--run"          => compiler.flags.push(Flag::Run),
             "-t" | "--tokens"       => compiler.flags.push(Flag::EmitTokens),
             "-v" | "--verbose"      => compiler.flags.push(Flag::Verbose),
+            "-I" | "--include"      => match it.next() {
+                Some(inc_path) => compiler.inc_paths.push(inc_path),
+                None => panic!("{}", usage(&com))
+            },
             _ => match in_path {
                 None => in_path = Some(arg),
                 Some(_) => panic!("{}", usage(&com)),

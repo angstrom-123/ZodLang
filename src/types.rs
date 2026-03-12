@@ -138,7 +138,7 @@ impl Analyser {
                 TokenType::OpSubscript => {
                     let rhs: &mut ParseNode = node.children.last_mut().unwrap();
                     rhs.datatype = self.typecheck_factor(rhs, ctx);
-                    if !rhs.datatype.is_int() {
+                    if !rhs.datatype.is_numeric() {
                         panic!("{} Error: Subscripts can only be integers. Expected int but got `{:?}`",
                                rhs.tok.pos, rhs.datatype);
                     }
@@ -164,13 +164,7 @@ impl Analyser {
                                node.tok.pos, ltyp, rhs.datatype);
                     }
 
-                    if matches!(node.tok.kind, TokenType::OpEqual | TokenType::OpNotEqual | 
-                                               TokenType::OpGreaterThan | TokenType::OpGreaterEqual | 
-                                               TokenType::OpLessThan | TokenType::OpLessEqual) {
-                        DataType::I64
-                    } else {
-                        ltyp
-                    }
+                    ltyp
                 },
             },
             NodeType::UnaryOp => {
@@ -262,7 +256,7 @@ impl Analyser {
     fn typecheck_syscall(&mut self, syscall: &mut ParseNode, ctx: &mut Context) -> DataType {
         for arg in &mut syscall.children {
             let arg_typ: DataType = self.typecheck_factor(arg, ctx);
-            if !arg_typ.is_int() && !arg_typ.is_ptr() {
+            if !arg_typ.is_numeric() && !arg_typ.is_ptr() {
                 panic!("{} Error: Syscalls only accept integers and pointers as arguments", 
                        syscall.tok.pos);
             }
@@ -299,7 +293,7 @@ impl Analyser {
     fn typecheck_conditional(&mut self, conditional: &mut ParseNode, ctx: &mut Context) {
         let cond: &mut ParseNode = conditional.children.first_mut().unwrap();
         let cond_typ: DataType = self.typecheck_factor(cond, ctx);
-        if !cond_typ.is_int() {
+        if !cond_typ.is_numeric() {
             panic!("{} Error: Invalid type for `if` condition. Expected int but got `{:?}`",
                    cond.tok.pos, cond_typ);
         }
@@ -327,7 +321,7 @@ impl Analyser {
         let cond: &mut ParseNode = for_loop.children.get_mut(2).unwrap();
         if !cond.is_null() {
             let cond_typ: DataType = self.typecheck_factor(cond, ctx);
-            if !cond_typ.is_int() {
+            if !cond_typ.is_numeric() {
                 panic!("{} Error: Invalid type for `for` condition. Expected int but got `{:?}`",
                        cond.tok.pos, cond_typ);
             }
@@ -350,7 +344,7 @@ impl Analyser {
         let cond: &mut ParseNode = while_loop.children.first_mut().unwrap();
         if !cond.is_null() {
             let cond_typ: DataType = self.typecheck_factor(cond, ctx);
-            if !cond_typ.is_int() {
+            if !cond_typ.is_numeric() {
                 panic!("{} Error: Invalid type for `while` condition. Expected int but got `{:?}`",
                        cond.tok.pos, cond_typ);
             }

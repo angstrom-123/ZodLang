@@ -9,7 +9,7 @@ any^ malloc(i64 len) {
 i64 strlen(chr^ str) {
     chr c = str[0];
     i64 i = 1;
-    while c != '\0' {
+    while c {
         c = str[i];
         i = i + 1;
     }
@@ -19,13 +19,6 @@ i64 strlen(chr^ str) {
 i64 puts(chr^ str) {
     i64 res = write(1, str, strlen(str));
     return res;
-}
-
-i64 mod(i64 x, i64 y) {
-    while x >= y {
-        x = x - y;
-    }
-    return x;
 }
 
 i64 putd(i64 x) {
@@ -41,8 +34,8 @@ i64 putd(i64 x) {
     chr^ buf = malloc(4096);
     i64 max_size = 32;
     i64 size = 0;
-    while x > 0 {
-        buf[max_size - size - 1] = mod(x, 10) + '0';
+    while x {
+        buf[max_size - size - 1] = x % 10 + '0';
         size = size + 1;
         x = x / 10;
     }
