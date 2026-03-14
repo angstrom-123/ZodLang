@@ -1,4 +1,4 @@
-include "std.lang"
+include "std.zod"
 
 i64 test_for_loop() {
     for i64 i = 0; i < 10; i = i + 1 {

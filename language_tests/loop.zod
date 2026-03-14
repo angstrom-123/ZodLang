@@ -1,4 +1,4 @@
-include "std.lang"
+include "std.zod"
 
 i64 main() {
     for i64 i = 0; i < 5; i = i + 1 {

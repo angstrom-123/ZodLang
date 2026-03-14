@@ -4,7 +4,7 @@ use super::*;
 
 static TEST_DIR: &str = "./language_tests/";
 static EXPECTED_EXT: &str = ".expected";
-static LANGUAGE_EXT: &str = ".lang";
+static LANGUAGE_EXT: &str = ".zod";
 
 // Attemtps to compile a file at ./language_tests/test_name.lang and runs it.
 // The output of the file is compared to the file at ./language_tests/test_name.expected.

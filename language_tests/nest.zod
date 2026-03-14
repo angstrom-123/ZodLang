@@ -1,4 +1,4 @@
-include "std.lang"
+include "std.zod"
 
 i64 foo(i64 n) {
     return bar(n) + bar(n) + bar(bar(n));

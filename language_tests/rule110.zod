@@ -1,15 +1,13 @@
-include "std.lang"
+include "std.zod"
 
 void main() {
     // Allocate buffer
     chr^ buf = malloc(4096);
-    // chr^ buf = malloc(4096 * 3);
 
     // Constant
     i64 wid = 100;
-    // i64 wid = 5000;
 
-    // Allocate sub buffers
+    // Allocate sub buffers (leaving space for null terminator)
     chr^ line_1 = buf;
     chr^ line_2 = buf + wid;
     chr^ window = buf + wid * 2;

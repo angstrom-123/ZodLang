@@ -1,4 +1,4 @@
-include "std.lang"
+include "std.zod"
 
 i64 fib(i64 n) {
     if n == 0 || n == 1 {

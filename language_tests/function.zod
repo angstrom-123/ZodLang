@@ -1,4 +1,4 @@
-include "std.lang"
+include "std.zod"
 
 i64 add_with_10(i64 a, i64 b) {
     i64 c = 10;
