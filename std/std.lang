@@ -16,6 +16,19 @@ i64 strlen(chr^ str) {
     return i - 1;
 }
 
+i64 streq(chr^ a, chr^ b) {
+    i64 len_a = strlen(a);
+    if len_a != strlen(b) {
+        return 0;
+    }
+    for i64 i = 0; i < len_a; i = i + 1 {
+        if a[i] != b[i] {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 i64 puts(chr^ str) {
     i64 res = write(1, str, strlen(str));
     return res;

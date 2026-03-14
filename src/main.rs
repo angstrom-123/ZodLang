@@ -1,20 +1,21 @@
 use std::env;
 use std::fs;
 
-use crate::compiler::Compiler;
-use crate::compiler::Flag;
-use crate::compiler::usage;
+use crate::compile::Compiler;
+use crate::compile::Flag;
+use crate::compile::usage;
 
 #[cfg(test)]
-pub mod tests;
+pub mod test;
 
-pub mod lexer;
-pub mod parser;
+pub mod lex;
+pub mod parse;
 pub mod types;
-pub mod representation;
+pub mod represent;
 pub mod asmgen;
 pub mod preprocess;
-pub mod compiler;
+pub mod compile;
+pub mod optimise;
                    
 fn main() {
     let mut compiler: Compiler = Compiler::new();
@@ -28,6 +29,7 @@ fn main() {
             "-a" | "--assembly"     => compiler.flags.push(Flag::EmitAsm),
             "-ir" | "--inter-repr"  => compiler.flags.push(Flag::EmitIR),
             "-o" | "--output"       => out_path = it.next(),
+            "-O" | "--optimise"     => compiler.flags.push(Flag::Optimise),
             "-pt" | "--parsetree"   => compiler.flags.push(Flag::EmitParseTree),
             "-r" | "--run"          => compiler.flags.push(Flag::Run),
             "-t" | "--tokens"       => compiler.flags.push(Flag::EmitTokens),

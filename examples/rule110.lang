@@ -3,11 +3,13 @@ include "std.lang"
 void main() {
     // Allocate buffer
     chr^ buf = malloc(4096);
+    // chr^ buf = malloc(4096 * 3);
 
     // Constant
     i64 wid = 100;
+    // i64 wid = 5000;
 
-    // Allocate sub buffers (leaving space for null terminator)
+    // Allocate sub buffers
     chr^ line_1 = buf;
     chr^ line_2 = buf + wid;
     chr^ window = buf + wid * 2;
@@ -54,17 +56,4 @@ void main() {
 
     munmap(buf, 4096);
     exit(0);
-}
-
-i64 streq(chr^ a, chr^ b) {
-    i64 len_a = strlen(a);
-    if len_a != strlen(b) {
-        return 0;
-    }
-    for i64 i = 0; i < len_a; i = i + 1 {
-        if a[i] != b[i] {
-            return 0;
-        }
-    }
-    return 1;
 }

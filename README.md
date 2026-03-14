@@ -25,15 +25,17 @@ cargo test
 <compiler_path> <input_file> <flags>
 ```
 
-| Flag         | Shorthand | Argument | Meaning                          |
-| -----------  | --------- | -------- | -------------------------------- |
-| --assembly   | -a        |          | Keep intermediate asm            |
-| --inter-repr | -ir       |          | Emit intermediate representation |
-| --output     | -o        | Out Path | Specify output path              |
-| --parsetree  | -pt       |          | Print parse tree                 |
-| --run        | -r        |          | Run after compiling              |
-| --tokens     | -t        |          | Print lexed tokens               |
-| --verbose    | -v        |          | Enable info logging              |
+| Flag         | Shorthand | Argument | Meaning                             |
+| -----------  | --------- | -------- | ----------------------------------- |
+| --assembly   | -a        |          | Keep intermediate asm               |
+| --include    | -I        | Dir Path | Specify path to search for includes |
+| --inter-repr | -ir       |          | Emit intermediate representation    |
+| --optimise   | -O        |          | Enable optimisation                 |
+| --output     | -o        | Out Path | Specify output path                 |
+| --parsetree  | -pt       |          | Print parse tree                    |
+| --run        | -r        |          | Run after compiling                 |
+| --tokens     | -t        |          | Print lexed tokens                  |
+| --verbose    | -v        |          | Enable info logging                 |
 
 ## Examples
 See the examples folder in the project root for some programs showcasing the 
@@ -47,6 +49,7 @@ language.
 - [x] Conditional if and else
 - [x] For and while loops
 - [x] Functions with params
+- [x] Turing complete
 - [ ] Assignment arithmetic operators (e.g. +=)
 - [ ] Increment and decrement operators
 - [ ] Logical negation operator

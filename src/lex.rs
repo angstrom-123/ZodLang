@@ -5,33 +5,33 @@ use std::fmt;
 #[derive(Eq)]
 #[derive(Hash)]
 #[derive(Clone)]
-pub enum TokenType {
+pub enum TokKind {
     None,
 
-    OpPlus,
-    OpMinus,
-    OpMul,
-    OpDiv,
-    OpAssign,
-    OpMod,
-    OpEqual,
-    OpNotEqual,
-    OpGreaterThan,
-    OpLessThan,
-    OpGreaterEqual,
-    OpLessEqual,
-    OpLogicalOr,
-    OpLogicalAnd,
-    OpDereference,
-    OpSubscript,
-    KeywordReturn,
-    KeywordIf,
-    KeywordElse,
-    KeywordFor,
-    KeywordBreak,
-    KeywordContinue,
-    KeywordWhile,
-    KeywordInclude,
+    Plus,
+    Minus,
+    Mul,
+    Div,
+    Assign,
+    Mod,
+    Equal,
+    NotEqual,
+    GT,
+    LT,
+    GE,
+    LE,
+    LogOr,
+    LogAnd,
+    Deref,
+    Subscript,
+    Return,
+    If,
+    Else,
+    For,
+    Break,
+    Continue,
+    While,
+    Include,
     TypeVoid,
     TypeInt64,
     TypeInt64Ptr,
@@ -44,61 +44,61 @@ pub enum TokenType {
     Syscall,
     End,
     Separator,
-    OpenParen,
-    CloseParen,
-    OpenSquare,
-    CloseSquare,
-    OpenScope,
-    CloseScope,
-    Identifier,
+    OParen,
+    CParen,
+    OSquare,
+    CSquare,
+    OScope,
+    CScope,
+    Ident,
 }
-impl TokenType {
+impl TokKind {
     pub fn val_str(&self) -> &'static str {
         match self {
-            TokenType::None                  => "",
-            TokenType::OpPlus                => "+",
-            TokenType::OpMinus               => "-",
-            TokenType::OpMul                 => "*",
-            TokenType::OpDiv                 => "/",
-            TokenType::OpAssign              => "=",
-            TokenType::OpMod                 => "%",
-            TokenType::OpEqual               => "==",
-            TokenType::OpNotEqual            => "!=",
-            TokenType::OpGreaterThan         => ">",
-            TokenType::OpLessThan            => "<",
-            TokenType::OpGreaterEqual        => ">=",
-            TokenType::OpLessEqual           => "<=",
-            TokenType::OpLogicalOr           => "||",
-            TokenType::OpLogicalAnd          => "&&",
-            TokenType::OpDereference         => "@",
-            TokenType::OpSubscript           => "[",
-            TokenType::KeywordReturn         => "return",
-            TokenType::KeywordIf             => "if",
-            TokenType::KeywordElse           => "else",
-            TokenType::KeywordFor            => "for",
-            TokenType::KeywordBreak          => "break",
-            TokenType::KeywordContinue       => "continue",
-            TokenType::KeywordWhile          => "while",
-            TokenType::KeywordInclude        => "include",
-            TokenType::TypeVoid              => "void",
-            TokenType::TypeInt64             => "i64",
-            TokenType::TypeInt64Ptr          => "i64^",
-            TokenType::TypeChr               => "chr",
-            TokenType::TypeChrPtr            => "chr^",
-            TokenType::TypeAnyPtr            => "any^",
-            TokenType::Int                   => "literal int",
-            TokenType::String                => "literal string",
-            TokenType::Char                  => "literal char",
-            TokenType::Syscall               => "syscall",
-            TokenType::End                   => ";",
-            TokenType::Separator             => ",",
-            TokenType::OpenParen             => "(",
-            TokenType::CloseParen            => ")",
-            TokenType::OpenSquare            => "[",
-            TokenType::CloseSquare           => "]",
-            TokenType::OpenScope             => "{",
-            TokenType::CloseScope            => "}",
-            TokenType::Identifier            => "identifier",
+            TokKind::None         => "",
+            TokKind::Plus         => "+",
+            TokKind::Minus        => "-",
+            TokKind::Mul          => "*",
+            TokKind::Div          => "/",
+            TokKind::Assign       => "=",
+            TokKind::Mod          => "%",
+            TokKind::Equal        => "==",
+            TokKind::NotEqual     => "!=",
+            TokKind::GT           => ">",
+            TokKind::LT           => "<",
+            TokKind::GE           => ">=",
+            TokKind::LE           => "<=",
+            TokKind::LogOr        => "||",
+            TokKind::LogAnd       => "&&",
+            TokKind::Deref        => "@",
+            TokKind::Subscript    => "[",
+            TokKind::Return       => "return",
+            TokKind::If           => "if",
+            TokKind::Else         => "else",
+            TokKind::For          => "for",
+            TokKind::Break        => "break",
+            TokKind::Continue     => "continue",
+            TokKind::While        => "while",
+            TokKind::Include      => "include",
+            TokKind::TypeVoid         => "void",
+            TokKind::TypeInt64    => "i64",
+            TokKind::TypeInt64Ptr => "i64^",
+            TokKind::TypeChr      => "chr",
+            TokKind::TypeChrPtr   => "chr^",
+            TokKind::TypeAnyPtr   => "any^",
+            TokKind::Int          => "literal int",
+            TokKind::String       => "literal string",
+            TokKind::Char         => "literal char",
+            TokKind::Syscall      => "syscall",
+            TokKind::End          => ";",
+            TokKind::Separator    => ",",
+            TokKind::OParen       => "(",
+            TokKind::CParen       => ")",
+            TokKind::OSquare      => "[",
+            TokKind::CSquare      => "]",
+            TokKind::OScope       => "{",
+            TokKind::CScope       => "}",
+            TokKind::Ident        => "identifier",
         }
     }
 }
@@ -136,17 +136,17 @@ impl Pos {
 #[derive(Eq)]
 #[derive(Hash)]
 #[derive(Clone)]
-pub struct Token {
-    pub kind: TokenType,
+pub struct Tok {
+    pub kind: TokKind,
     pub val: Vec<u8>,
     pub pos: Pos,
 }
-impl fmt::Display for Token {
+impl fmt::Display for Tok {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {:?} `{}`", self.pos(), self.kind, self.val_str())
     }
 }
-impl Token {
+impl Tok {
     pub fn val_str(&self) -> String {
         String::from_utf8(self.val.clone()).expect("Error: Failed to convert token value to string")
     }
@@ -160,16 +160,16 @@ impl Token {
     }
 
     pub fn null() -> Self {
-        Token {
-            kind: TokenType::None,
+        Tok {
+            kind: TokKind::None,
             val: vec![],
             pos: Pos { row: u32::MAX, col: u32::MAX, file: String::from("NULL") },
         }
     }
 
     pub fn null_at(pos: Pos) -> Self {
-        Token {
-            kind: TokenType::None,
+        Tok {
+            kind: TokKind::None,
             val: vec![],
             pos: pos.clone(),
         }
@@ -177,7 +177,7 @@ impl Token {
 }
 
 pub struct Lexer {
-    pub toks: Vec<Token>,
+    pub toks: Vec<Tok>,
     pub pos: Pos,
     src: Vec<u8>,
     pub cur: usize,
@@ -210,30 +210,30 @@ impl Lexer {
         self.cur < self.toks.len() - 1
     }
 
-    pub fn consume_token(&mut self) -> Token {
+    pub fn consume_token(&mut self) -> Tok {
         let tok = self.toks.get(self.cur).expect("Error: Lexer failed to consume next token");
         self.cur += 1;
         tok.clone()
     }
 
-    pub fn peek_token(&mut self) -> Token {
+    pub fn peek_token(&mut self) -> Tok {
         let tok = self.toks.get(self.cur).expect("Error: Lexer failed to peek next token");
         tok.clone()
     }
 
-    pub fn peek_next_token(&mut self) -> Token {
+    pub fn peek_next_token(&mut self) -> Tok {
         let tok = self.toks.get(self.cur + 1).expect("Error: Lexer failed to peek next token");
         tok.clone()
     }
 
-    pub fn expect_type(&mut self) -> Token {
-        const KINDS: [TokenType; 6] = [
-            TokenType::TypeVoid,
-            TokenType::TypeInt64,
-            TokenType::TypeInt64Ptr,
-            TokenType::TypeChr,
-            TokenType::TypeChrPtr,
-            TokenType::TypeAnyPtr,
+    pub fn expect_type(&mut self) -> Tok {
+        const KINDS: [TokKind; 6] = [
+            TokKind::TypeVoid,
+            TokKind::TypeInt64,
+            TokKind::TypeInt64Ptr,
+            TokKind::TypeChr,
+            TokKind::TypeChrPtr,
+            TokKind::TypeAnyPtr,
         ];
 
         let tok = self.consume_token();
@@ -244,7 +244,7 @@ impl Lexer {
         panic!("{} Error: Expected type but got `{}`",  tok.pos, tok.val_str());
     }
 
-    pub fn expect_tokens(&mut self, kinds: Vec<TokenType>) -> Token {
+    pub fn expect_tokens(&mut self, kinds: Vec<TokKind>) -> Tok {
         let tok = self.consume_token();
         if kinds.contains(&tok.kind) {
             return tok;
@@ -257,7 +257,7 @@ impl Lexer {
         panic!("");
     }
 
-    pub fn expect_token(&mut self, kind: TokenType) -> Token {
+    pub fn expect_token(&mut self, kind: TokKind) -> Tok {
         let tok = self.consume_token();
         if tok.kind == kind {
             return tok;
@@ -285,8 +285,8 @@ impl Lexer {
             match self.rune {
                 b' ' | b'\n' => {
                     if !lexeme.is_empty() {
-                        self.toks.push(Token {
-                            kind: TokenType::None,
+                        self.toks.push(Tok {
+                            kind: TokKind::None,
                             val: lexeme.clone(),
                             pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                         });
@@ -302,8 +302,8 @@ impl Lexer {
                             self.advance_char();
                             continue;
                         } else {
-                            self.toks.push(Token {
-                                kind: TokenType::None,
+                            self.toks.push(Tok {
+                                kind: TokKind::None,
                                 val: lexeme.clone(),
                                 pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                             });
@@ -315,8 +315,8 @@ impl Lexer {
                 },
                 b'\'' => {
                     if !lexeme.is_empty() {
-                        self.toks.push(Token {
-                            kind: TokenType::None,
+                        self.toks.push(Tok {
+                            kind: TokKind::None,
                             val: lexeme.clone(),
                             pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                         });
@@ -342,8 +342,8 @@ impl Lexer {
 
                     self.advance_char();
                     lexeme.push(self.rune);
-                    self.toks.push(Token {
-                        kind: TokenType::None,
+                    self.toks.push(Tok {
+                        kind: TokKind::None,
                         val: lexeme.clone(),
                         pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                     });
@@ -351,8 +351,8 @@ impl Lexer {
                 },
                 b'\"' => {
                     if !lexeme.is_empty() {
-                        self.toks.push(Token {
-                            kind: TokenType::None,
+                        self.toks.push(Tok {
+                            kind: TokKind::None,
                             val: lexeme.clone(),
                             pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                         });
@@ -384,8 +384,8 @@ impl Lexer {
                 },
                 b'@' | b';' | b'+' | b'*' | b'(' | b')' | b'{' | b'}' | b'[' | b']' | b'%' => {
                     if !lexeme.is_empty() {
-                        self.toks.push(Token {
-                            kind: TokenType::None,
+                        self.toks.push(Tok {
+                            kind: TokKind::None,
                             val: lexeme.clone(),
                             pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                         });
@@ -393,8 +393,8 @@ impl Lexer {
                     }
 
                     lexeme.push(self.rune);
-                    self.toks.push(Token {
-                        kind: TokenType::None,
+                    self.toks.push(Tok {
+                        kind: TokKind::None,
                         val: lexeme.clone(),
                         pos: Pos { row: self.pos.row, col: self.pos.col, file: self.pos.file.clone() },
                     });
@@ -402,8 +402,8 @@ impl Lexer {
                 },
                 b'>' | b'<' | b'!' | b'-' => {
                     if !lexeme.is_empty() {
-                        self.toks.push(Token {
-                            kind: TokenType::None,
+                        self.toks.push(Tok {
+                            kind: TokKind::None,
                             val: lexeme.clone(),
                             pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                         });
@@ -417,8 +417,8 @@ impl Lexer {
                         if matches!(last, b'>' | b'<' | b'=' | b'!') {
                             lexeme.push(self.rune);
                         } else {
-                            self.toks.push(Token {
-                                kind: TokenType::None,
+                            self.toks.push(Tok {
+                                kind: TokKind::None,
                                 val: lexeme.clone(),
                                 pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                             });
@@ -435,8 +435,8 @@ impl Lexer {
                         if matches!(last, b'&' | b'|') {
                             lexeme.push(self.rune);
                         }
-                        self.toks.push(Token {
-                            kind: TokenType::None,
+                        self.toks.push(Tok {
+                            kind: TokKind::None,
                             val: lexeme.clone(),
                             pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                         });
@@ -451,8 +451,8 @@ impl Lexer {
                         if matches!(last, b'A'..=b'z' | b'0'..=b'9') {
                             lexeme.push(self.rune);
                         } else {
-                            self.toks.push(Token {
-                                kind: TokenType::None,
+                            self.toks.push(Tok {
+                                kind: TokKind::None,
                                 val: lexeme.clone(),
                                 pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                             });
@@ -465,8 +465,8 @@ impl Lexer {
                 },
                 _ => {
                     if !lexeme.is_empty() {
-                        self.toks.push(Token {
-                            kind: TokenType::None,
+                        self.toks.push(Tok {
+                            kind: TokKind::None,
                             val: lexeme.clone(),
                             pos: Pos { row: self.pos.row, col: self.pos.col - lexeme.len() as u32, file: self.pos.file.clone() },
                         });
@@ -509,65 +509,65 @@ impl Lexer {
                 panic!("{} Error: Cannot have an empty token", tok.pos);
             } else if len == 1 {
                 match first { // First try to match using first byte
-                    b'+' => tok.kind = TokenType::OpPlus,
-                    b'-' => tok.kind = TokenType::OpMinus,
-                    b'*' => tok.kind = TokenType::OpMul,
-                    b'/' => tok.kind = TokenType::OpDiv,
-                    b'=' => tok.kind = TokenType::OpAssign,
-                    b'>' => tok.kind = TokenType::OpGreaterThan,
-                    b'<' => tok.kind = TokenType::OpLessThan,
-                    b'@' => tok.kind = TokenType::OpDereference,
-                    b'(' => tok.kind = TokenType::OpenParen,
-                    b')' => tok.kind = TokenType::CloseParen,
-                    b'[' => tok.kind = TokenType::OpenSquare,
-                    b']' => tok.kind = TokenType::CloseSquare,
-                    b'{' => tok.kind = TokenType::OpenScope,
-                    b'}' => tok.kind = TokenType::CloseScope,
-                    b';' => tok.kind = TokenType::End,
-                    b',' => tok.kind = TokenType::Separator,
-                    b'%' => tok.kind = TokenType::OpMod,
-                    b'0'..=b'9' => tok.kind = TokenType::Int,
-                    b'A'..=b'z' => tok.kind = TokenType::Identifier,
+                    b'+' => tok.kind = TokKind::Plus,
+                    b'-' => tok.kind = TokKind::Minus,
+                    b'*' => tok.kind = TokKind::Mul,
+                    b'/' => tok.kind = TokKind::Div,
+                    b'=' => tok.kind = TokKind::Assign,
+                    b'>' => tok.kind = TokKind::GT,
+                    b'<' => tok.kind = TokKind::LT,
+                    b'@' => tok.kind = TokKind::Deref,
+                    b'(' => tok.kind = TokKind::OParen,
+                    b')' => tok.kind = TokKind::CParen,
+                    b'[' => tok.kind = TokKind::OSquare,
+                    b']' => tok.kind = TokKind::CSquare,
+                    b'{' => tok.kind = TokKind::OScope,
+                    b'}' => tok.kind = TokKind::CScope,
+                    b';' => tok.kind = TokKind::End,
+                    b',' => tok.kind = TokKind::Separator,
+                    b'%' => tok.kind = TokKind::Mod,
+                    b'0'..=b'9' => tok.kind = TokKind::Int,
+                    b'A'..=b'z' => tok.kind = TokKind::Ident,
                     _ => panic!("{} Error: Invalid token `{}`", tok.pos, tok.val_str()),
                 }
             } else {
                 match tok.val_str().as_str() {
                     // Ops
-                    "=="       => tok.kind = TokenType::OpEqual,
-                    "!="       => tok.kind = TokenType::OpNotEqual,
-                    ">="       => tok.kind = TokenType::OpGreaterEqual,
-                    "<="       => tok.kind = TokenType::OpLessEqual,
-                    "&&"       => tok.kind = TokenType::OpLogicalAnd,
-                    "||"       => tok.kind = TokenType::OpLogicalOr,
+                    "=="       => tok.kind = TokKind::Equal,
+                    "!="       => tok.kind = TokKind::NotEqual,
+                    ">="       => tok.kind = TokKind::GE,
+                    "<="       => tok.kind = TokKind::LE,
+                    "&&"       => tok.kind = TokKind::LogAnd,
+                    "||"       => tok.kind = TokKind::LogOr,
                     // Keywords
-                    "if"       => tok.kind = TokenType::KeywordIf,
-                    "else"     => tok.kind = TokenType::KeywordElse,
-                    "for"      => tok.kind = TokenType::KeywordFor,
-                    "while"    => tok.kind = TokenType::KeywordWhile,
-                    "continue" => tok.kind = TokenType::KeywordContinue,
-                    "break"    => tok.kind = TokenType::KeywordBreak,
-                    "return"   => tok.kind = TokenType::KeywordReturn,
-                    "include"  => tok.kind = TokenType::KeywordInclude,
+                    "if"       => tok.kind = TokKind::If,
+                    "else"     => tok.kind = TokKind::Else,
+                    "for"      => tok.kind = TokKind::For,
+                    "while"    => tok.kind = TokKind::While,
+                    "continue" => tok.kind = TokKind::Continue,
+                    "break"    => tok.kind = TokKind::Break,
+                    "return"   => tok.kind = TokKind::Return,
+                    "include"  => tok.kind = TokKind::Include,
                     // Types
-                    "void"     => tok.kind = TokenType::TypeVoid,
-                    "i64"      => tok.kind = TokenType::TypeInt64,
-                    "i64^"     => tok.kind = TokenType::TypeInt64Ptr,
-                    "chr"      => tok.kind = TokenType::TypeChr,
-                    "chr^"     => tok.kind = TokenType::TypeChrPtr,
-                    "any^"     => tok.kind = TokenType::TypeAnyPtr,
+                    "void"     => tok.kind = TokKind::TypeVoid,
+                    "i64"      => tok.kind = TokKind::TypeInt64,
+                    "i64^"     => tok.kind = TokKind::TypeInt64Ptr,
+                    "chr"      => tok.kind = TokKind::TypeChr,
+                    "chr^"     => tok.kind = TokKind::TypeChrPtr,
+                    "any^"     => tok.kind = TokKind::TypeAnyPtr,
                     // Intrinsics
-                    "syscall" => tok.kind = TokenType::Syscall,
+                    "syscall" => tok.kind = TokKind::Syscall,
                     _ => { // Then match variable contents of words
                         // Allow for negative literals
                         if tok.val.iter().skip(1).all(|c| c.is_ascii_digit()) && (first.is_ascii_digit() || *first == b'-') {
-                            tok.kind = TokenType::Int;
+                            tok.kind = TokKind::Int;
                         } else if *first == b'\'' {
-                            tok.kind = TokenType::Char;
+                            tok.kind = TokKind::Char;
                             // Strip off speech marks
                             tok.val.pop();
                             tok.val.remove(0);
                         } else if *first == b'\"' {
-                            tok.kind = TokenType::String;
+                            tok.kind = TokKind::String;
                             // Strip off speech marks
                             tok.val.pop();
                             tok.val.remove(0);
@@ -581,7 +581,7 @@ impl Lexer {
                                            tok.pos, String::from_utf8(vec![*c]).expect("Error: Failed to convert char to str"));
                                 }
                             }
-                            tok.kind = TokenType::Identifier;
+                            tok.kind = TokKind::Ident;
                         } else {
                             panic!("{} Error: Invalid token `{}`", tok.pos, tok.val_str());
                         }

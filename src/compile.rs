@@ -1,11 +1,12 @@
 use std::process::Command;
 
 use crate::asmgen;
-use crate::lexer::{Lexer};
-use crate::parser::ParseTree;
+use crate::lex::{Lexer};
+use crate::parse::AST;
 use crate::preprocess::Processor;
-use crate::representation::IR;
+use crate::represent::IR;
 use crate::types::Analyser;
+use crate::optimise::Optimiser;
 
 #[derive(PartialEq)]
 pub enum Flag {
@@ -13,6 +14,7 @@ pub enum Flag {
     EmitParseTree,
     EmitAsm,
     EmitIR,
+    Optimise,
     Run,
     Verbose
 }
@@ -63,7 +65,7 @@ impl Compiler {
         preprocessor.resolve_includes(&mut lexer, include_paths);
     
         self.info("Constructing AST");
-        let mut ast: ParseTree = ParseTree::new();
+        let mut ast: AST = AST::new();
         ast.construct(&mut lexer);
 
         self.info("Performing Static Type Analysis");
@@ -75,7 +77,6 @@ impl Compiler {
             ast.dump();
             eprintln!();
         }
-    
 
         self.info("Generating Intermediate Representation");
         let mut ir: IR = IR::new();
@@ -84,6 +85,12 @@ impl Compiler {
             self.info("Emitting Intermediate Representation:");
             ir.dump();
             eprintln!();
+        }
+        
+        if self.flags.contains(&Flag::Optimise) {
+            self.info("Optimising Intermediate Representation");
+            let mut optimiser: Optimiser = Optimiser::new();
+            optimiser.optimise(&mut ir);
         }
     
         self.info("Generating Assembly (nasm x86_64)");
@@ -159,6 +166,7 @@ format!("
   \x1b[33m-ir             --inter-repr           \x1b[0m      Print intermediate representation
   \x1b[33m-I    <path>    --include     <path>   \x1b[0m      Specify path to search for includes
   \x1b[33m-o    <path>    --output      <path>   \x1b[0m      Specify output file path
+  \x1b[33m-O              --optimise             \x1b[0m      Enable optimisation
   \x1b[33m-p              --parsetree            \x1b[0m      Print parse tree
   \x1b[33m-r              --run                  \x1b[0m      Run after compiling
   \x1b[33m-t              --tokens               \x1b[0m      Print tokens

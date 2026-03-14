@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::lexer::{Lexer, Token, TokenType};
+use crate::lex::{Lexer, Tok, TokKind};
 
 pub struct Processor {
 
@@ -20,10 +20,10 @@ impl Processor {
     pub fn resolve_includes(&mut self, lexer: &mut Lexer, include_paths: Vec<String>) -> bool {
         let mut resolved: bool = false;
         while lexer.has_token() {
-            let tok: Token = lexer.consume_token();
-            if tok.kind == TokenType::KeywordInclude {
+            let tok: Tok = lexer.consume_token();
+            if tok.kind == TokKind::Include {
                 // Get String Literal
-                let file: Token = lexer.expect_token(TokenType::String);
+                let file: Tok = lexer.expect_token(TokKind::String);
 
                 // Find Source File
                 let mut file_src: Option<Vec<u8>> = None;
