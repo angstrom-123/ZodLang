@@ -1,5 +1,5 @@
 void main() {
-    putd(10 + 1 + 2 - 4 * 2 + 10);
+    putd(10);
 
     syscall(60, 0);
 }
