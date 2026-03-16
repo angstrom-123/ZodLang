@@ -74,7 +74,7 @@ pub enum NodeKind {
     UnaryOp,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Node {
     pub kind:     NodeKind,
     pub datatype: Datatype,
@@ -92,6 +92,16 @@ impl Node {
         for child in &self.children {
             child.dump(_depth + 4);
         }
+    }
+
+    pub fn in_order(&self) -> Vec<Node> {
+        let mut res: Vec<Node> = Vec::new();
+        res.push(self.clone());
+        for node in &self.children {
+            res.append(&mut node.in_order());
+        }
+
+        res
     }
 
     pub fn exclusive_post_order(&self) -> Vec<Node> {
@@ -344,8 +354,16 @@ impl AST {
         }
     }
 
-    // NOTE: Currently hard coded intrinsice (dump, exit, mmap, munmap) are entered here as if 
-    // they were regular functions, this lets the type checker pass.
+    pub fn find_node(&self, ident: &Tok) -> Node {
+        for node in &self.root.post_order() {
+            if node.tok == *ident {
+                return node.clone();
+            }
+        }
+
+        panic!("{} Error: Couldn't find node with token {}", ident.pos, ident.val_str());
+    }
+
     pub fn construct(&mut self, lexer: &mut Lexer) {
         let mut children: Vec<Node> = Vec::new();
         while lexer.has_token() {

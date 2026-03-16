@@ -1,0 +1,108 @@
+include "std.zod"
+
+void main() {
+    i64 dim = 20; // width and height
+    i64 sleep_ns = 100000000; // 100ms
+
+    chr^ in_grid = malloc(4096);
+    chr^ out_grid = in_grid + dim * dim;
+
+    // Empty Grids
+    for i64 i = 0; i < dim * dim; i = i + 1 {
+        in_grid[i] = ' ';
+        out_grid[i] = ' ';
+    }
+    
+    // Glider
+    in_grid[get_ix(dim, 17, 3)] = '#';
+    in_grid[get_ix(dim, 18, 3)] = '#';
+    in_grid[get_ix(dim, 19, 3)] = '#';
+    in_grid[get_ix(dim, 17, 2)] = '#';
+    in_grid[get_ix(dim, 18, 1)] = '#';
+
+    while 1 {
+        for i64 x = 0; x < dim; x = x + 1 {
+            for i64 y = 0; y < dim; y = y + 1 {
+                update(in_grid, out_grid, dim, x, y);
+            }
+        }
+
+        print_board(in_grid, dim);
+        
+        // Swap buffers
+        chr^ tmp = in_grid;
+        in_grid = out_grid;
+        out_grid = tmp;
+
+        // Zero out output
+        for i64 i = 0; i < dim * dim; i = i + 1 {
+            out_grid[i] = ' ';
+        }
+
+        sleepns(sleep_ns);
+    }
+
+    exit(0);
+}
+
+void update(chr^ in_grid, chr^ out_grid, i64 dim, i64 x, i64 y) {
+    i64 live_neighbours = 0;
+    for i64 xx = -1; xx <= 1; xx = xx + 1 {
+        for i64 yy = -1; yy <= 1; yy = yy + 1 {
+            // Don't count the cell itself as a neighbour
+            if xx == 0 && yy == 0 { continue; }
+            
+            i64 x_crd = x + xx;
+            i64 y_crd = y + yy;
+            
+            // Wrap around
+            if x_crd == -1  { x_crd = dim - 1; }
+            if y_crd == -1  { y_crd = dim - 1; }
+            if x_crd == dim { x_crd = 0; }
+            if y_crd == dim { y_crd = 0; }
+            i64 ix = get_ix(dim, x_crd, y_crd);
+
+            if in_grid[ix] == '#' {
+                live_neighbours = live_neighbours + 1;
+            }
+        }
+    }
+
+    i64 ix = get_ix(dim, x, y);
+    out_grid[ix] = in_grid[ix];
+
+    if in_grid[ix] == '#' {
+        if live_neighbours < 2 || live_neighbours > 3 {
+            // Over / under population death
+            out_grid[ix] = ' ';
+        }
+    } else {
+        if live_neighbours == 3 {
+            // Reproduction
+            out_grid[ix] = '#';
+        }
+    }
+}
+
+// A bit of pretty printing
+void print_board(chr^ grid, i64 dim) {
+    puts("+--------------------+\n");
+    for i64 i = 0; i < dim; i = i + 1 {
+        write(1, "|", 1);
+        write(1, grid + dim * i, dim);
+        write(1, "|\n", 2);
+    }
+    puts("+--------------------+\n");
+}
+
+i64 gety(i64 dim, i64 index) {
+    return index / dim; // Integer division
+}
+
+i64 getx(i64 dim, i64 index) {
+    return index % dim;
+}
+
+i64 get_ix(i64 dim, i64 x, i64 y) {
+    return y * dim + x;
+}

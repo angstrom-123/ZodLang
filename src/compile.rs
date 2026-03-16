@@ -79,8 +79,8 @@ impl Compiler {
         }
 
         self.info("Generating Intermediate Representation");
-        let mut ir: IR = IR::new();
-        ir.generate_from_ast(&ast);
+        let mut ir: IR = IR::new(&ast);
+        ir.generate();
         if self.flags.contains(&Flag::EmitIR) {
             self.info("Emitting Intermediate Representation:");
             ir.dump();

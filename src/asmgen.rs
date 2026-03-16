@@ -102,7 +102,7 @@ pub mod nasm_x86_64 {
                     writeln!(f, "    mov {}, 0", instr.opera)?;
                     writeln!(f, "    setne {}", instr.opera.byte())?;
                 },
-                InstrKind::RegBNEIntLitA => {
+                InstrKind::RegBNeIntLitA => {
                     writeln!(f, "    cmp {}, {}", instr.operb, instr.opera)?;
                     writeln!(f, "    mov {}, 0", instr.operb)?;
                     writeln!(f, "    setne {}", instr.operb.byte())?;

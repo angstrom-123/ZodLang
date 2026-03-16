@@ -54,7 +54,7 @@ pub enum InstrKind {
     RegBGeA,             // Stores 1 in register A if register B >= A, else 0
     RegBEqA,             // Stores 1 in register A if register B == A, else 0
     RegBNeA,             // Stores 1 in register A if register B != A, else 0
-    RegBNEIntLitA,       // Stores 1 in register A if literal B != A, else 0
+    RegBNeIntLitA,       // Stores 1 in register A if literal B != A, else 0
     DeallocateStack,     // Deallocates some bytes from the stack
     JLabel,              // Jumps unconditionally to a label
     Call,                // Calls a function by its label
@@ -525,7 +525,7 @@ impl Instr {
 
     fn int_lit_a_ne_reg_b(a: i64, b: Register, size: i64) -> Self {
         Instr {
-            kind: InstrKind::RegBNEIntLitA,
+            kind: InstrKind::RegBNeIntLitA,
             opera: Operand::LiteralInt { value: a },
             operb: Operand::Register { name: b, size },
         }
@@ -626,24 +626,21 @@ impl Context {
     }
 }
 
-pub struct IR {
+pub struct IR<'a> {
     pub instrs: Vec<Instr>,
     pub cur: usize,
     labels: HashSet<Label>,
     strs: Vec<Vec<u8>>,
+    ast: &'a AST,
 }
-impl Default for IR {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-impl IR {
-    pub fn new() -> Self {
+impl<'a> IR<'a> {
+    pub fn new(ast: &'a AST) -> Self {
         IR {
             instrs: Vec::new(),
             labels: HashSet::new(),
             strs: Vec::new(),
-            cur: 0
+            cur: 0,
+            ast
         }
     }
 
@@ -671,8 +668,8 @@ impl IR {
         self.cur < self.instrs.len()
     }
 
-    pub fn generate_from_ast(&mut self, ast: &AST) {
-        for stmt in ast.root.children.iter() {
+    pub fn generate(&mut self) {
+        for stmt in self.ast.root.children.iter() {
             match stmt.kind {
                 NodeKind::FuncDecl => {
                     self.instrs.push(Instr::comment("Function Declaration"));
@@ -902,7 +899,7 @@ impl IR {
             NodeKind::WhileLoop => {
                 self.instrs.push(Instr::comment("While"));
                 let mut loop_label: Label = Label::new_at(".while_", &stmt.tok.pos());
-                let mut post_label: Label = Label::new_at(".post_", &stmt.tok.pos());
+                let mut continue_label: Label = Label::new_at(".continue_", &stmt.tok.pos());
                 let mut break_label: Label = Label::new_at(".break_", &stmt.tok.pos());
                 let mut end_label: Label = Label::new_at(".end_", &stmt.tok.pos());
 
@@ -927,15 +924,14 @@ impl IR {
                     }
                 }
 
-                self.record_label(&mut post_label);
                 // Deallocate body locals
                 let new_locals: usize = while_ctx.locals.len() - ctx.locals.len();
                 if new_locals > 0 {
                     self.instrs.push(Instr::dealloc_stack(new_locals as i64 * 8));
                 }
 
-                self.instrs.push(Instr::label(&post_label));
-
+                self.record_label(&mut continue_label);
+                self.instrs.push(Instr::label(&continue_label));
                 self.instrs.push(Instr::jlabel(&loop_label));
 
                 // Breaking out could skip deallocating locals, so we clean up here
@@ -955,7 +951,7 @@ impl IR {
                 self.instrs.push(Instr::comment("For"));
                 // Labels
                 let mut loop_label: Label = Label::new_at(".for_", &stmt.tok.pos());
-                let mut post_label: Label = Label::new_at(".post_", &stmt.tok.pos());
+                let mut continue_label: Label = Label::new_at(".continue_", &stmt.tok.pos());
                 let mut break_label: Label = Label::new_at(".break_", &stmt.tok.pos());
                 let mut end_label: Label = Label::new_at(".end_", &stmt.tok.pos());
 
@@ -1000,28 +996,30 @@ impl IR {
 
                 // Post 
                 self.instrs.push(Instr::comment("Post"));
-                self.record_label(&mut post_label);
-                self.instrs.push(Instr::label(&post_label));
 
                 let new_locals: usize = for_ctx.locals.len() - ctx.locals.len();
                 if new_locals > 0 {
                     self.instrs.push(Instr::dealloc_stack(new_locals as i64 * 8));
                 }
+
+                // Continue handles stack dealloc
+                self.record_label(&mut continue_label);
+                self.instrs.push(Instr::label(&continue_label));
 
                 if let Some(post) = stmt.children.get(3) && !post.is_null() {
                     self.generate_from_statement(post, &mut for_ctx);
                 }
                 self.instrs.push(Instr::jlabel(&loop_label));
 
-                // Breaking out could skip deallocating locals, so we clean up here
+                // Break handles stack dealloc and skips the loop jump
                 self.record_label(&mut break_label);
                 self.instrs.push(Instr::label(&break_label));
 
                 // Deallocate body locals
-                let new_locals: usize = for_ctx.locals.len() - ctx.locals.len();
-                if new_locals > 0 {
-                    self.instrs.push(Instr::dealloc_stack(new_locals as i64 * 8));
-                }
+                // let new_locals: usize = for_ctx.locals.len() - ctx.locals.len();
+                // if new_locals > 0 {
+                //     self.instrs.push(Instr::dealloc_stack(new_locals as i64 * 8));
+                // }
 
                 self.instrs.push(Instr::comment("End"));
                 self.record_label(&mut end_label);
@@ -1238,25 +1236,23 @@ impl IR {
                     TokKind::LogAnd => {
                         self.instrs.push(Instr::comment("BinOp Logical And"));
 
-                        let mut rhs_label: Label = Label::new_at(".rhs_", &node.tok.pos());
+                        let mut false_label: Label = Label::new_at(".false_", &node.tok.pos());
                         let mut end_label: Label = Label::new_at(".end_", &node.tok.pos());
-
                         self.instrs.append(&mut vec![
                             Instr::pop(Register::RAX),
                             Instr::pop(Register::RBX),
-                            Instr::jzero(Register::RAX, &end_label, node.datatype.size()),
-                            Instr::jlabel(&rhs_label)
+                            Instr::jzero(Register::RAX, &false_label, node.datatype.size()),
+                            Instr::jzero(Register::RBX, &false_label, node.datatype.size()),
+                            Instr::push_int_lit(1),
+                            Instr::jlabel(&end_label),
                         ]);
 
-                        self.record_label(&mut rhs_label);
-                        self.instrs.push(Instr::label(&rhs_label));
-                        
-                        self.instrs.push(Instr::int_lit_a_ne_reg_b(0, Register::RBX, node.datatype.size()));
+                        self.record_label(&mut false_label);
+                        self.instrs.push(Instr::label(&false_label));
+                        self.instrs.push(Instr::push_int_lit(0));
 
                         self.record_label(&mut end_label);
                         self.instrs.push(Instr::label(&end_label));
-
-                        self.instrs.push(Instr::push_reg(Register::RAX));
                     },
                     TokKind::Subscript => {
                         // Stack contains var, index
@@ -1349,15 +1345,40 @@ impl IR {
                     panic!("{} Error: Unexpected continue in invalid scope `{}`", ctx.ident.pos, ctx.ident.val_str());
                 }
 
+                // Iterate over statements in func to find this continue to see how 
+                // many local variables have been declared, hence how many to dealloc
+                let mut var_cnt: i64 = 0;
+                let func: Node = self.ast.find_node(&ctx.ident);
+                for n in &func.children.last().unwrap().in_order() {
+                    if n.kind == NodeKind::VarDecl { var_cnt += 1; }
+                    if *n == *node { break; }
+                }
+
+                if var_cnt > 0 {
+                    self.instrs.push(Instr::dealloc_stack(var_cnt * 8));
+                }               
+
                 self.instrs.push(Instr::comment("Continue"));
 
                 // This label should exist at this point.
-                let label: Label = Label::new_at(".post_", &ctx.ident.pos());
+                let label: Label = Label::new_at(".continue_", &ctx.ident.pos());
                 self.instrs.push(Instr::jlabel(&label));
             },
             NodeKind::Break => {
                 if ctx.ident.kind == TokKind::None {
                     panic!("{} Error: Unexpected break in invalid scope `{}`", ctx.ident.pos, ctx.ident.val_str());
+                }
+
+                // Iterate over statements in func to find this break to see how 
+                // many local variables have been declared, hence how many to dealloc
+                let mut var_cnt: i64 = 0;
+                let func: Node = self.ast.find_node(&ctx.ident);
+                for n in &func.children.last().unwrap().in_order() {
+                    if n.kind == NodeKind::VarDecl { var_cnt += 1; }
+                    if n.kind == NodeKind::Continue && n.tok.pos == node.tok.pos { break; }
+                }
+                if var_cnt > 0 {
+                    self.instrs.push(Instr::dealloc_stack(var_cnt * 8));
                 }
 
                 self.instrs.push(Instr::comment("Break"));

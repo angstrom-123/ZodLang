@@ -32,7 +32,7 @@ i64 shmat(i64 shmid, chr^ shmaddr, i64 shmflg) { return syscall(30, shmid, shmad
 i64 dup(i64 fildes) { return syscall(32, fildes); }
 i64 dup2(i64 oldfd, i64 newfd) { return syscall(33, oldfd, newfd); }
 i64 pause() { return syscall(34); }
-// nanosleep
+i64 nanosleep(i64^ timespec_rq, i64^ timespec_rm) { return syscall(35, timespec_rq, timespec_rm); }
 // getitimer
 i64 alarm(i64 seconds) { return syscall(37, seconds); }
 // setitimer

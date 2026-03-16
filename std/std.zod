@@ -1,5 +1,25 @@
 include "./linux.zod"
 
+i64 sleepns(i64 ns) {
+    i64^ rem = 0;
+    i64^ ts = malloc(4096);
+    ts[0] = 0;
+    ts[1] = ns;
+    i64 res = nanosleep(ts, rem);
+    munmap(ts, 4096);
+    return res;
+}
+
+i64 sleep(i64 s) {
+    i64^ rem = 0;
+    i64^ ts = malloc(4096);
+    ts[0] = s;
+    ts[1] = 0;
+    i64 res = nanosleep(ts, rem);
+    munmap(ts, 4096);
+    return res;
+}
+
 // For now, this is an atrocious implementation.
 // Maybe one day I will write a better one and an accompanying free.
 any^ malloc(i64 len) {
