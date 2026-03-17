@@ -10,6 +10,6 @@ i64 fib(i64 n) {
 
 i64 main() {
     puts("The 10th fibonacci number is: ");
-    putd(fib(10));
+    writed(fib(10));
     exit(0);
 }
