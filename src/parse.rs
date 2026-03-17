@@ -13,7 +13,7 @@ use crate::types::Datatype;
 // <Type>           : "i64" | "i64^" | "chr" | "chr^" | "any^"
 // <Assign>         : <Ident> "=" <Union> 
 //                  | "@" "(" <Additive> ")" "=" <Union>
-// <Unary>          : "-" | "@"
+// <Unary>          : "-" | "@" | "!"
 // <Statement>      : "return" <Additive> ";"
 //                  | "break" ";"
 //                  | "continue" ";"
@@ -26,7 +26,8 @@ use crate::types::Datatype;
 // <Union>          : <Intersection> [ "||" <Intersection> ]
 // <Intersection>   : <Equality>     [ "&&" <Equality> ]
 // <Equality>       : <Relational> [ ( "==" | "!=" ) <Relational> ]
-// <Relational>     : <Additive>   [ ( "<" | ">" | "<=" | ">=" ) <Additive> ]
+// <Relational>     : <Additive>   [ ( "<" | ">" | "<=" | ">=" ) <Bitwise> ]
+// <Bitwise>        : <Term>       [ ( "<<" | ">>" | "|" | "&" ) <Additive> ]
 // <Additive>       : <Term>       [ ( "+" | "-" | "%" ) <Term> ]
 // <Term>           : <Factor>     [ ( "*" | "/" ) <Factor> ]
 // <Factor>         : <Literal-Int> 
@@ -43,6 +44,7 @@ static OP_PRECEDENCE: &[&[TokKind]; Precedence::_Count as usize] = &[
     &[TokKind::LogAnd],
     &[TokKind::Equal, TokKind::NotEqual],
     &[TokKind::GT, TokKind::GE, TokKind::LT, TokKind::LE],
+    &[TokKind::Shl, TokKind::Shr, TokKind::BitOr, TokKind::BitAnd],
     &[TokKind::Plus, TokKind::Minus, TokKind::Mod],
     &[TokKind::Mul, TokKind::Div],
     &[]
@@ -333,9 +335,10 @@ pub enum Precedence {
     Intersection    = 1,
     Equality        = 2,
     Relational      = 3,
-    Additive        = 4,
-    Term            = 5,
-    Factor          = 6,
+    Bitwise         = 4,
+    Additive        = 5,
+    Term            = 6,
+    Factor          = 7,
     _Count
 }
 
@@ -555,7 +558,8 @@ impl AST {
     // <Union>          : <Intersection> [ "||" <Intersection> ]
     // <Intersection>   : <Equality>     [ "&&" <Equality> ]
     // <Equality>       : <Relational>   [ ( "==" | "!=" ) <Relational> ]
-    // <Relational>     : <Additive>     [ ( "<" | ">" | "<=" | ">=" ) <Additive> ]
+    // <Relational>     : <Additive>   [ ( "<" | ">" | "<=" | ">=" ) <Bitwise> ]
+    // <Bitwise>        : <Term>       [ ( "<<" | ">>" | "|" | "&" ) <Additive> ]
     // <Additive>       : <Term>         [ ( "+" | "-" ) <Term> ]
     // <Term>           : <Factor>       [ ( "*" | "/" ) <Factor> ]
     fn parse_expression(&mut self, lexer: &mut Lexer, level: usize) -> Node {
@@ -599,7 +603,7 @@ impl AST {
                 lexer.expect_token(TokKind::CParen);
                 expr
             },
-            TokKind::Minus | TokKind::Deref => {
+            TokKind::Minus | TokKind::Deref | TokKind::Not => {
                 Node::un_op(lexer.consume_token(), self.parse_factor(lexer))
             },
             _ => panic!("{} Error: Expected factor but got `{}`", lexer.peek_token().pos, lexer.peek_token().val_str())

@@ -240,9 +240,9 @@ impl Analyser {
             },
             NodeKind::UnaryOp => {
                 let child: &mut Node = node.children.first_mut().unwrap();
-                // match node.tok.kind {
                 match node.tok.kind {
-                    TokKind::Minus => self.typecheck_factor(child, ctx),
+                    TokKind::Minus 
+                    | TokKind::Not => self.typecheck_factor(child, ctx),
                     TokKind::Deref => {
                         let typ: Datatype = self.typecheck_factor(child, ctx);
                         match typ.base_type() {

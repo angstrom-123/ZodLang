@@ -9,7 +9,7 @@ i64 bar(i64 n) {
 }
 
 i64 main() {
-    putd(foo(2));
+    writed(foo(2));
     exit(0);
 }
 

@@ -10,10 +10,10 @@ i64 no_args() {
 }
 
 i64 main() {
-    putd(add_with_10(2, 3));
-    putd(add_with_10(5, 6));
+    writed(add_with_10(2, 3));
+    writed(add_with_10(5, 6));
     i64 a = add_with_10(1 + 2 * 3, 6 / 2);
-    putd(a);
-    putd(add_with_10(no_args(), no_args()));
+    writed(a);
+    writed(add_with_10(no_args(), no_args()));
     exit(0);
 }

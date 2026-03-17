@@ -2,60 +2,60 @@ include "std.zod"
 
 i64 main() {
     if 2 >1 {
-        putd(1);
-        putd(2);
+        writed(1);
+        writed(2);
     }
 
     if 5 <= 5 {
-        putd(3);
+        writed(3);
     }
 
     if 0 >= 0 {
-        putd(4);
+        writed(4);
     }
 
     if 3 == 3 { 
-        putd(5); 
+        writed(5); 
     }
 
     if 5 != 6 { 
-        putd(6); 
+        writed(6); 
     }
 
     if 10 < 20 && 20 < 100 { 
-        putd(7);
+        writed(7);
     }
     
     if 10 < 20 || 20 > 100 { 
-        putd(8); 
+        writed(8); 
     }
 
     if 10 < 20 && 20 < 100 || 20 > 100 && 100 == 23 { 
-        putd(9); 
+        writed(9); 
     }
 
     if 8 * 4 > 7 * 4 {
-        putd(10);
+        writed(10);
     }
 
     if 0 * 9 > 20 {
-        putd(0);
+        writed(0);
     } else {
-        putd(11);
+        writed(11);
     }
 
     i64 a = 10;
     i64 b = 20;
     if a < b && a == 10 || b == 10 {
-        putd(12);
+        writed(12);
     }
 
     if (1 || 0) && 1 {
-        putd(13);
+        writed(13);
     }
 
     if 1 || (0 && 1) {
-        putd(14);
+        writed(14);
     }
 
     exit(0);

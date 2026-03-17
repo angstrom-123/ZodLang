@@ -1,0 +1,15 @@
+include "std.zod"
+
+void main() {
+    puts("What's your name?\n> ");
+
+    // Read up to 256 bytes from stdin until newline
+    chr^ buf = malloc(4096);
+    inputn(buf, 256);
+
+    puts("Hello, ");
+    puts(buf);
+
+    munmap(buf, 4096);
+    exit(0);
+}

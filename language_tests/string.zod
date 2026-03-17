@@ -1,16 +1,16 @@
 include "std.zod"
 
 i64 main() {
-    putd(strlen("Hello, World!\n"));
+    writed(strlen("Hello, World!\n"));
 
-    putd(strlen("Hello, World!\n"));
+    writed(strlen("Hello, World!\n"));
 
     any^ str = "Hello, World!\n";
     syscall(1, 1, str, 14);
 
     syscall(1, 1, "Hello, World!\n", 14);
 
-    putd(strlen("Hello, World!\n"));
+    writed(strlen("Hello, World!\n"));
     puts("Hello, World!\n");
 
     chr^ a = malloc(4096);

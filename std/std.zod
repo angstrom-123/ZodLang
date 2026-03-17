@@ -49,14 +49,27 @@ i64 streq(chr^ a, chr^ b) {
     return 1;
 }
 
+i64 writes(chr^ str) {
+    i64 res = puts(str);
+    puts("\n");
+    return res;
+}
+
 i64 puts(chr^ str) {
     i64 res = write(1, str, strlen(str));
     return res;
 }
 
+// TODO: change all tests to use writed
+i64 writed(i64 x) {
+    i64 res = putd(x);
+    puts("\n");
+    return res;
+}
+
 i64 putd(i64 x) {
     if x == 0 {
-        return puts("0\n");
+        return puts("0");
     }
 
     i64 orig = x;
@@ -77,9 +90,32 @@ i64 putd(i64 x) {
         size = size + 1;
     }
 
-    buf[max_size] = '\n';
     i64 res = puts(buf + max_size - size);
     munmap(buf, 4096);
 
     return res;
+}
+
+// Reads one byte at a time from stdin until a newline character.
+// NOTE: the provided buffer must have enough space for the input.
+void input(chr^ buf) {
+    i64 len;
+    while 1 {
+        read(2, buf + len, 1);
+        if buf[len] == '\n' { break; }
+        len = len + 1;
+    }
+    buf[len + 1] = '\0';
+}
+
+// Reads up to n bytes, one byte at a time from stdin until a newline character.
+// NOTE: the provided buffer must have space for n + 1 bytes (for the null terminator)
+void inputn(chr^ buf, i64 n) {
+    i64 len;
+    while len < n {
+        read(2, buf + len, 1);
+        if buf[len] == '\n' { break; }
+        len = len + 1;
+    }
+    buf[len + 1] = '\0';
 }

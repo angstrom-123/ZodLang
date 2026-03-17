@@ -84,3 +84,4 @@ i64 mkdir(chr^ pathname, i64 mode) { return syscall(83, pathname, mode); }
 i64 rmdir(chr^ pathname) { return syscall(84, pathname); }
 i64 creat(chr^ pathname, i64 mode) { return syscall(85, pathname, mode); }
 // ...
+i64 time(i64^ time) { return syscall(201, time); }

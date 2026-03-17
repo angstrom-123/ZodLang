@@ -6,13 +6,13 @@ i64 main() {
     if a == 10 {
         a = 30;
         i64 b = 10;
-        putd(b);
+        writed(b);
     }
 
     i64 b = 20;
 
-    putd(b);
-    putd(a);
+    writed(b);
+    writed(a);
 
     exit(0);
 }

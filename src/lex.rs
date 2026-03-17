@@ -16,10 +16,15 @@ pub enum TokKind {
     Mod,
     Equal,
     NotEqual,
+    Not,
     GT,
     LT,
     GE,
     LE,
+    BitOr,
+    BitAnd,
+    Shl,
+    Shr,
     LogOr,
     LogAnd,
     Deref,
@@ -64,10 +69,15 @@ impl TokKind {
             TokKind::Mod          => "%",
             TokKind::Equal        => "==",
             TokKind::NotEqual     => "!=",
+            TokKind::Not          => "!",
             TokKind::GT           => ">",
             TokKind::LT           => "<",
             TokKind::GE           => ">=",
             TokKind::LE           => "<=",
+            TokKind::Shl          => "<<",
+            TokKind::Shr          => ">>",
+            TokKind::BitOr        => "|",
+            TokKind::BitAnd       => "&",
             TokKind::LogOr        => "||",
             TokKind::LogAnd       => "&&",
             TokKind::Deref        => "@",
@@ -80,7 +90,7 @@ impl TokKind {
             TokKind::Continue     => "continue",
             TokKind::While        => "while",
             TokKind::Include      => "include",
-            TokKind::TypeVoid         => "void",
+            TokKind::TypeVoid     => "void",
             TokKind::TypeInt64    => "i64",
             TokKind::TypeInt64Ptr => "i64^",
             TokKind::TypeChr      => "chr",
@@ -400,7 +410,7 @@ impl Lexer {
                     });
                     lexeme.clear();
                 },
-                b'>' | b'<' | b'!' | b'-' => {
+                b'!' | b'-' => {
                     if !lexeme.is_empty() {
                         self.toks.push(Tok {
                             kind: TokKind::None,
@@ -411,7 +421,7 @@ impl Lexer {
                     }
                     lexeme.push(self.rune);
                 },
-                b'=' => {
+                b'=' | b'>' | b'<' => {
                     if !lexeme.is_empty() {
                         let last: &u8 = lexeme.last().expect("Error: Failed to get last char in lexeme");
                         if matches!(last, b'>' | b'<' | b'=' | b'!') {
@@ -516,6 +526,9 @@ impl Lexer {
                     b'=' => tok.kind = TokKind::Assign,
                     b'>' => tok.kind = TokKind::GT,
                     b'<' => tok.kind = TokKind::LT,
+                    b'|' => tok.kind = TokKind::BitOr,
+                    b'&' => tok.kind = TokKind::BitAnd,
+                    b'!' => tok.kind = TokKind::Not,
                     b'@' => tok.kind = TokKind::Deref,
                     b'(' => tok.kind = TokKind::OParen,
                     b')' => tok.kind = TokKind::CParen,
@@ -537,6 +550,8 @@ impl Lexer {
                     "!="       => tok.kind = TokKind::NotEqual,
                     ">="       => tok.kind = TokKind::GE,
                     "<="       => tok.kind = TokKind::LE,
+                    "<<"       => tok.kind = TokKind::Shl,
+                    ">>"       => tok.kind = TokKind::Shr,
                     "&&"       => tok.kind = TokKind::LogAnd,
                     "||"       => tok.kind = TokKind::LogOr,
                     // Keywords

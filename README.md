@@ -40,8 +40,8 @@ By default, after running `cargo build -r`,  zodc will be in `./target/release/z
 | --verbose    | -v        |          | Enable info logging                 |
 
 ## Examples
-See the examples folder in the project root for some programs showcasing the 
-language.
+See the examples folder to see Zod in action!
+Some interesting examples include Conway's game of life, and the game 2048 in the terminal.
 
 ## Features
 The language is Turing complete and usable for simple tasks, but it lacks several 
@@ -68,8 +68,8 @@ this in the future, but it is more likely that I will write a new language inste
 - [ ] Complete syntax for stack based arrays
 - [ ] Assignment arithmetic operators (e.g. +=)
 - [ ] Increment and decrement operators
-- [ ] Logical negation operator
-- [ ] Bitwise operators
+- [x] Logical negation operator
+- [x] Bitwise operators
 - [ ] Conditional elif
 - [ ] Ternary expressions
 - [ ] Global variables 

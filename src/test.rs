@@ -68,6 +68,8 @@ fn test_index() { run_test("index", false); }
 fn test_string() { run_test("string", false); }
 #[test]
 fn test_rule110() { run_test("rule110", false); }
+#[test]
+fn test_shift() { run_test("shift", false); }
 
 #[test]
 fn test_optimised_arithmetic() { run_test("arithmetic", true); }
@@ -95,3 +97,5 @@ fn test_optimised_index() { run_test("index", true); }
 fn test_optimised_string() { run_test("string", true); }
 #[test]
 fn test_optimised_rule110() { run_test("rule110", true); }
+#[test]
+fn test_optimised_shift() { run_test("shift", true); }

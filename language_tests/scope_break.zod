@@ -2,15 +2,15 @@ include "std.zod"
 
 i64 test_for_loop() {
     for i64 i = 0; i < 10; i = i + 1 {
-        putd(i);
+        writed(i);
         for i64 j = 0; j < 10; j = j + 1 {
-            putd(100 + j);
+            writed(100 + j);
             if j == 5 {
                 break;
             }
         }
 
-        putd(200 + i);
+        writed(200 + i);
         if i == 5 {
             break;
         }
@@ -22,15 +22,15 @@ i64 test_for_loop() {
 i64 test_while_loop() {
     i64 i = 0;
     while i < 10 {
-        putd(i);
+        writed(i);
         for i64 j = 0; j < 10; j = j + 1 {
-            putd(100 + j);
+            writed(100 + j);
             if j == 5 {
                 break;
             }
         }
 
-        putd(200 + i);
+        writed(200 + i);
         if i == 5 {
             break;
         }

@@ -37,6 +37,10 @@ pub enum InstrKind {
     Syscall,             // Make a syscall
     Push,                // Push a register or int literal or str onto the stack
     Pop,                 // Pop the stack into a register
+    Shl,                 // Shifts registers A left by register B bits
+    Shr,                 // Shifts register A right by regiter B bits
+    BOr,                 // Bitwise or of A and B, result in A
+    BAnd,                // Bitwise and of A and B, result in A
     Add,                 // Adds registers A and B, result in A
     Mul,                 // Multiplies registers A by B, result in A
     DivAByBManglingD,    // Divides A by B, mangles D, result in RAX
@@ -339,6 +343,38 @@ impl Instr {
         }
     }
 
+    fn shl(a: Register, b: Register, size: i64) -> Self {
+        Instr {
+            kind: InstrKind::Shl,
+            opera: Operand::Register { name: a, size },
+            operb: Operand::Register { name: b, size }
+        }
+    }
+
+    fn shr(a: Register, b: Register, size: i64) -> Self {
+        Instr {
+            kind: InstrKind::Shr,
+            opera: Operand::Register { name: a, size },
+            operb: Operand::Register { name: b, size }
+        }
+    }
+
+    fn bor(a: Register, b: Register, size: i64) -> Self {
+        Instr {
+            kind: InstrKind::BOr,
+            opera: Operand::Register { name: a, size },
+            operb: Operand::Register { name: b, size }
+        }
+    }
+
+    fn band(a: Register, b: Register, size: i64) -> Self {
+        Instr {
+            kind: InstrKind::BAnd,
+            opera: Operand::Register { name: a, size },
+            operb: Operand::Register { name: b, size }
+        }
+    }
+
     fn pop(name: Register) -> Self {
         Instr {
             kind: InstrKind::Pop,
@@ -512,6 +548,14 @@ impl Instr {
             kind: InstrKind::RegBEqA,
             opera: Operand::Register { name: a, size },
             operb: Operand::Register { name: b, size },
+        }
+    }
+
+    fn reg_b_eq_int_lit_a(a: Register, b: i64, size: i64) -> Self {
+        Instr {
+            kind: InstrKind::RegBEqA,
+            opera: Operand::Register { name: a, size },
+            operb: Operand::LiteralInt { value: b },
         }
     }
 
@@ -1209,6 +1253,42 @@ impl<'a> IR<'a> {
                             Instr::push_reg(Register::RAX),
                         ]);
                     },
+                    TokKind::Shl => {
+                        self.instrs.push(Instr::comment("BinOp Shl"));
+                        self.instrs.append(&mut vec![
+                            Instr::pop(Register::RBX),
+                            Instr::pop(Register::RAX),
+                            Instr::shl(Register::RAX, Register::RBX, node.datatype.size()),
+                            Instr::push_reg(Register::RAX),
+                        ]);
+                    },
+                    TokKind::Shr => {
+                        self.instrs.push(Instr::comment("BinOp Shr"));
+                        self.instrs.append(&mut vec![
+                            Instr::pop(Register::RBX),
+                            Instr::pop(Register::RAX),
+                            Instr::shr(Register::RAX, Register::RBX, node.datatype.size()),
+                            Instr::push_reg(Register::RAX),
+                        ]);
+                    },
+                    TokKind::BitOr => {
+                        self.instrs.push(Instr::comment("BinOp Bitwise Or"));
+                        self.instrs.append(&mut vec![
+                            Instr::pop(Register::RBX),
+                            Instr::pop(Register::RAX),
+                            Instr::bor(Register::RAX, Register::RBX, node.datatype.size()),
+                            Instr::push_reg(Register::RAX),
+                        ]);
+                    },
+                    TokKind::BitAnd => {
+                        self.instrs.push(Instr::comment("BinOp Bitwise And"));
+                        self.instrs.append(&mut vec![
+                            Instr::pop(Register::RBX),
+                            Instr::pop(Register::RAX),
+                            Instr::band(Register::RAX, Register::RBX, node.datatype.size()),
+                            Instr::push_reg(Register::RAX),
+                        ]);
+                    },
                     TokKind::LogOr => {
                         self.instrs.push(Instr::comment("BinOp Logical Or"));
 
@@ -1279,6 +1359,14 @@ impl<'a> IR<'a> {
             },
             NodeKind::UnaryOp => {
                 match node.tok.kind {
+                    TokKind::Not => {
+                        self.instrs.push(Instr::comment("UnOp Not"));
+                        self.instrs.append(&mut vec![
+                            Instr::pop(Register::RAX),
+                            Instr::reg_b_eq_int_lit_a(Register::RAX, 0, node.datatype.size()),
+                            Instr::push_reg(Register::RAX),
+                        ]);
+                    },
                     TokKind::Minus => {
                         self.instrs.push(Instr::comment("UnOp Minus"));
                         self.instrs.append(&mut vec![

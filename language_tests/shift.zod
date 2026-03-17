@@ -1,0 +1,10 @@
+include "std.zod"
+
+void main() {
+    i64 a = 32;
+    a = a << 2;
+    writed(a);
+    a = a >> 3;
+    writed(a);
+    exit(0);
+}

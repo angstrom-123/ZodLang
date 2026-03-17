@@ -2,19 +2,19 @@ include "std.zod"
 
 i64 main() {
     i64 a = 10;
-    putd(a);
+    writed(a);
 
     i64 b = a*a + 2;
-    putd(b);
+    writed(b);
 
     i64 c = 2 + a + b;
-    putd(c);
+    writed(c);
 
-    putd(a + b);
+    writed(a + b);
 
-    putd(b / a);
+    writed(b / a);
 
-    putd(c - 100);
+    writed(c - 100);
 
     exit(0);
 }

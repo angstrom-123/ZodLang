@@ -26,10 +26,33 @@ pub mod nasm_x86_64 {
                     writeln!(f, "    mov {}, [rbp {}]", instr.opera, instr.operb)?;
                 },
                 InstrKind::Push => {
-                    writeln!(f, "    push {}", instr.opera)?;
+                    if let Operand::LiteralInt { value: _ } = instr.opera {
+                        writeln!(f, "    mov rax, {}", instr.opera)?;
+                        writeln!(f, "    push rax")?;
+                    } else {
+                        writeln!(f, "    push {}", instr.opera)?;
+                    }
                 },
                 InstrKind::Pop => {
                     writeln!(f, "    pop {}", instr.opera)?;
+                },
+                InstrKind::Shl => {
+                    if !operand_is_n(&instr.operb, 0) {
+                        writeln!(f, "    mov cl, {}", instr.operb.byte())?;
+                        writeln!(f, "    shl {}, cl", instr.opera)?;
+                    }
+                },
+                InstrKind::Shr => {
+                    if !operand_is_n(&instr.operb, 0) {
+                        writeln!(f, "    mov cl, {}", instr.operb.byte())?;
+                        writeln!(f, "    shr {}, cl", instr.opera)?;
+                    }
+                },
+                InstrKind::BOr => {
+                    writeln!(f, "    or {}, {}", instr.opera, instr.operb)?;
+                },
+                InstrKind::BAnd => {
+                    writeln!(f, "    and {}, {}", instr.opera, instr.operb)?;
                 },
                 InstrKind::Add => {
                     if !operand_is_n(&instr.operb, 0) {
