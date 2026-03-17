@@ -6,7 +6,7 @@ static TEST_DIR: &str = "./language_tests/";
 static EXPECTED_EXT: &str = ".expected";
 static LANGUAGE_EXT: &str = ".zod";
 
-// Attemtps to compile a file at ./language_tests/test_name.lang and runs it.
+// Attemtps to compile a file at ./language_tests/test_name.zod and runs it.
 // The output of the file is compared to the file at ./language_tests/test_name.expected.
 // If the output matches, the test passes, otherwise the test fails.
 fn run_test(test_name: &str, optimise: bool) {
