@@ -39,6 +39,23 @@ void main() {
     print_board(board);
 
     while 1 {
+        // Check for end conditions
+        i64 won = 0;
+        i64 lost = 1;
+        for i64 i = 0; i < 4 * 4; i = i + 1 {
+            i64 n = board[i];
+            if n == 2048 { won = 1; }
+            if n == -1 { lost = 0; }
+        }
+        if won { 
+            puts("Congratulations, you won the game!\n");
+            break;
+        }
+        if lost {
+            puts("Better luck next time\n");
+            break;
+        }
+
         // Accept and apply inputs
         while 1 {
             puts("> ");
@@ -57,25 +74,6 @@ void main() {
             state[i] = 0;
         }
 
-        print_board(board);
-
-        // Check for end conditions
-        i64 won = 0;
-        i64 lost = 1;
-        for i64 i = 0; i < 4 * 4; i = i + 1 {
-            i64 n = board[i];
-            if n == 2048 { won = 1; }
-            if n == -1 { lost = 0; }
-        }
-        if won { 
-            puts("Congratulations, you won the game!\n");
-            break;
-        }
-        if lost {
-            puts("Better luck next time\n");
-            break;
-        }
-
         // Place a new tile randomly
         placed = 0;
         while !placed {
@@ -85,6 +83,8 @@ void main() {
                 board[ix] = random_tile_val(rng_state);
             }
         }
+
+        print_board(board);
     }
 
     exit(0);
